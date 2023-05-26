@@ -9,6 +9,7 @@
     Also calls an artisan script to autmate the entire upload,validation and cvrp process of remedix
 
     0.9 beta initial
+    1.0 initial version - db + config init, download from server to server
 
 """
 
@@ -85,12 +86,26 @@ Array
 import paramiko
 import logging
 import datetime as dt
-# need to import dsslib
+import os
 import sys
-#sys.path.insert(0, '/Users/pessyhollander/Documents/CiBeez/SW_Dev//omni-dss/omni-dss')
-#import dsslib
+from sys import platform as _platform
+import mysql.connector
+from mysql.connector import errorcode
+import sqlalchemy
+from sqlalchemy.exc import SQLAlchemyError
+import json
+import fnmatch
+
 
 sftp_remedix_v = '0.9'
+
+# db connectors
+db_connector = None
+ssh_tunnel_host = None
+server = None
+dss_config = None
+_python39 = False
+
 
 port = 22
 host = 'remedix.packetauth.com'
@@ -98,6 +113,108 @@ user = 'Ucibeez'
 password = 'Remedix@2023!'
 download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
 download_pod_from_server_dir = '/var/www/html/order-capture-implementation/storage/pods/Remedix/'
+
+
+def dss_load_config():
+    wd = os.environ.get('DSS_WD', '.')
+    dss_config_file = os.path.join(wd, "config/dss-config.json")
+    if not os.path.isfile(dss_config_file):
+        logging.error('ERR missing dss-config.json configuraion file ')
+        return False, None
+
+    with open(dss_config_file) as json_data_file:
+        data = json.load(json_data_file)
+
+    #global _dev
+    #_dev = data.get('dss-locker-url').find('dev') != -1
+    #mylog('dss-server running on {} env'.format("DEV" if _dev else "PROD"), 'debug')
+
+
+    return True, data
+
+def init_db():
+
+    global _python39
+
+    # db config , init db connector and sshtunnel
+    wd = os.environ.get('DSS_WD', '.')
+    option_files = os.path.join(wd, "config/dss-mysql.cnf")
+    if not os.path.isfile(option_files):
+        errmsg = 'ERR missing dss-mysql.cnf configuraion file '
+        logging.error(errmsg)
+        return None, None, None
+
+    config = {
+        'option_files': option_files,  # "'dss-mysql.cnf',
+        'option_groups': ['Client', 'DSS']
+    }
+
+    # -------------------------------------------------------------
+    # this peace of code is used only when testing from a client
+    # -------------------------------------------------------------
+    logging.debug("Executed from " + _platform + " machine ")
+    # when using from client, set to your own config
+    ssh_tunnel_host = None
+    try:
+        ssh_tunnel_host = os.environ['DSS_TUNNEL_HOST']
+        ssh_private_key = '/Users/pessyhollander/.ssh/id_rsa'
+        ssh_username = 'pessyhollander'
+    except:
+        pass
+
+    server = None
+
+    if ssh_tunnel_host:
+        import sshtunnel
+        logging.info("Initiating sshtunnel from a MAC OS machine ")
+        print("Initiating sshtunnel from a MAC OS machine ")
+        try:
+            server = sshtunnel.SSHTunnelForwarder(
+                (ssh_tunnel_host, 22),
+                ssh_private_key=ssh_private_key,
+                ssh_username=ssh_username,
+                remote_bind_address=('127.0.0.1', 3306),
+            )
+            server.start()
+            connected_port = server.local_bind_port
+            logging.debug("connected to port: {0}".format(connected_port))
+        except Exception as e:
+            logging.error('sshtunnel forwarding failed: {0}'.format(e))
+            return None, None, None
+
+        config['host'] = '127.0.0.1'
+        config['port'] = connected_port
+    # ------------------------------------------------------------
+
+    try:
+        if not _python39: # we still use it in v.3.7.5 for compatability, will be removed later
+            db_connector = mysql.connector.connect(**config)
+            logging.debug("_python39 is False, using db_connector: {0}".format(db_connector))
+        else:
+            connection_data = 'mysql+pymysql://{user}:{password}@{host}:{port}/{db}'.format(user=dss_config.get('sqlalchemy').get('user'),
+                                                                                            password=dss_config.get('sqlalchemy').get('password'),
+                                                                                            host=dss_config.get('sqlalchemy').get('host'),
+                                                                                            port=dss_config.get('sqlalchemy').get('port') if not ssh_tunnel_host else config['port'],
+                                                                                            db=dss_config.get('sqlalchemy').get('db'))
+            engine = sqlalchemy.create_engine(connection_data, echo=False)
+            db_connector = engine.connect()
+            logging.debug("_python39 is True, using sqlalchemy engine and connection : {0}".format(db_connector))
+
+        logging.debug("Connected to db, db connection: {0}".format(db_connector))
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            logging.error("ERR: (mysql.connector) Something is wrong with your user name or password. err: ֻֻ{0}".format(
+                err.errno))
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            logging.error("ERR: (mysql.connector) Database does not exist. err: ֻֻ{0}".format(err.errno))
+        else:
+            logging.error("ERR: (mysql.connector) {0}".format(err))
+        return None, None, None
+    except SQLAlchemyError as err:
+        logging.error("ERR: SQLAlchemyError err (create_engine) {0}".format(str(err.__dict__['orig'])))
+        return None, None, None
+
+    return db_connector, ssh_tunnel_host, server
 
 #Auth types: user_pass, key_only, key_and_pass
 #You can pass a junk string in for password or sftp_key if not used
@@ -129,29 +246,22 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
     return sftp, transport
 
 
-
-
-
-if __name__ == "__main__":
-    print('sftp_remedix version: {0}'.format(sftp_remedix_v ))
-    logging.basicConfig(filename='./log/sftp_remedix.log',
-                        format="%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-
-    today = dt.datetime.now().strftime("%d%m%y")
-    #download_file = 'CiBeez_140523'
-    #download_file = 'CiBeez_' + today  # this is for testing
-    download_file = 'CiBeez' + '_NEXTDAY_' + today
-    sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
+"""
+    download_from_remedix
+"""
+def download_from_remedix(sftp):
     if sftp:
-        files = sftp.listdir('From remedix')  # list files in dir
-        # find match in files
-        file_nd_found = [match for match in files if download_file in match]
+
+        remote_files = sftp.listdir('From remedix')  # list files in dir
         f_size = 0
         f_time = 0
-        if file_nd_found != []:
-            for file in file_nd_found:
+
+        #file_pattern = 'CiBeez_NEXTDAY_{0}*.txt'.format(dt.datetime.now().strftime("%d%m%y"))
+        file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
+        selected_files = fnmatch.filter(remote_files, file_pattern)
+
+        if selected_files != []:
+            for file in selected_files:
                 print('file: {}, size: {}, time: {}'.format(file, sftp.stat(file).st_size, sftp.stat(file).st_mtime))
                 #lstatout = str(sftp.lstat(file)).split()[0]
                 #if 'd' not in lstatout:
@@ -161,15 +271,43 @@ if __name__ == "__main__":
             msg = "found nd file to download : {}".format(download_this)
             print(msg)
             logging.debug(msg)
-            #logger.warning(msg)
             # download file
-            sftp.get(download_this, './download/{0}'.format(download_this))
-            msg = "{} downloaded to ./download/.".format(download_this)
+            if _platform == 'darwin': # on my MAC
+                local_dir = './download/'
+            else:
+                local_dir = download_to_server_dir
+            sftp.get(download_this, '{0}/{1}'.format(local_dir, download_this))
+            msg = "{0} downloaded to {1}".format(download_this, local_dir)
             print(msg)
             logging.debug(msg)
+            return True, download_this
         else:
             msg = "Nothing to download..."
             print(msg)
             logging.debug(msg)
+            return False, None
+    return False, None
+
+if __name__ == "__main__":
+
+    python_ver = str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
+    _python39 = int(python_ver.split('.')[1]) >= 9  # means >= '3.9.xxx'
+    print('sftp_remedix version: {0}, python version: {1}'.format(sftp_remedix_v,python_ver ))
+    logging.basicConfig(filename='./log/sftp_remedix.log',
+                        format="%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    ok_cnf, dss_config = dss_load_config()
+
+    db_connector, ssh_tunnel_host, server = init_db()
+    today = dt.datetime.now().strftime("%d%m%y")
+    #download_file = 'CiBeez_140523'
+    #download_file = 'CiBeez_' + today  # this is for testing
+    download_file = 'CiBeez' + '_NEXTDAY_' + today
+    sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
+    if sftp:
+        ok_download, file_name = download_from_remedix(sftp)
+
 
 
