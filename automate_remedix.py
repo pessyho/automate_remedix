@@ -97,7 +97,7 @@ import json
 import fnmatch
 
 
-sftp_remedix_v = '0.9'
+sftp_remedix_v = '1.0'
 
 # db connectors
 db_connector = None
@@ -107,7 +107,8 @@ dss_config = None
 _python39 = False
 
 
-port = 22
+port_mac = 22
+port_server = 80
 host = 'remedix.packetauth.com'
 user = 'Ucibeez'
 password = 'Remedix@2023!'
@@ -305,9 +306,11 @@ if __name__ == "__main__":
     #download_file = 'CiBeez_140523'
     #download_file = 'CiBeez_' + today  # this is for testing
     download_file = 'CiBeez' + '_NEXTDAY_' + today
-    sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
+    sftp, transport = connect_to_sftp(host, port_mac if _platform == 'darwin' else port_server, user, password, None, 'user_pass')
     if sftp:
         ok_download, file_name = download_from_remedix(sftp)
+
+    logging.debug("Done.")
 
 
 
