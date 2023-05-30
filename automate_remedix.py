@@ -95,6 +95,7 @@ import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 import json
 import fnmatch
+import subprocess
 
 
 sftp_remedix_v = '1.0'
@@ -107,8 +108,7 @@ dss_config = None
 _python39 = False
 
 
-port_mac = 22
-port_server = 80
+port = 22
 host = 'remedix.packetauth.com'
 user = 'Ucibeez'
 password = 'Remedix@2023!'
@@ -217,6 +217,22 @@ def init_db():
 
     return db_connector, ssh_tunnel_host, server
 
+"""
+    run_cvrp_automation(file_name) . Execute automated script  after download:
+    
+        input: file_name, the downloaded file name, str
+        output: success, True/False
+        
+    1. go to directory /var/www/html/order-capture-implementation
+    2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
+    {foldername} is 
+    download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
+    
+    
+"""
+def run_cvrp_automation(downloaded_file):
+
+
 #Auth types: user_pass, key_only, key_and_pass
 #You can pass a junk string in for password or sftp_key if not used
 def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
@@ -306,7 +322,7 @@ if __name__ == "__main__":
     #download_file = 'CiBeez_140523'
     #download_file = 'CiBeez_' + today  # this is for testing
     download_file = 'CiBeez' + '_NEXTDAY_' + today
-    sftp, transport = connect_to_sftp(host, port_mac if _platform == 'darwin' else port_server, user, password, None, 'user_pass')
+    sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
         ok_download, file_name = download_from_remedix(sftp)
 
