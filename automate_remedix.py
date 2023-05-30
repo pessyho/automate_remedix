@@ -294,7 +294,7 @@ def download_from_remedix(sftp):
                 local_dir = './download/'
             else:
                 local_dir = download_to_server_dir
-            sftp.get(download_this, '{0}/{1}'.format(local_dir, download_this))
+            sftp.get(download_this, '{0}{1}'.format(local_dir, download_this))
             msg = "{0} downloaded to {1}".format(download_this, local_dir)
             print(msg)
             logging.debug(msg)
