@@ -10,8 +10,10 @@
 
     0.9 beta initial
     1.0 initial version - db + config init, download from server to server
+    1.1 run_mk_pdf  & upload_pods_to_remedix
 
 """
+
 
 """
     Execute automated script after download:
@@ -96,9 +98,11 @@ from sqlalchemy.exc import SQLAlchemyError
 import json
 import fnmatch
 import subprocess
+import socket
+import pandas as pd
 
 
-sftp_remedix_v = '1.0'
+sftp_remedix_v = '1.1'
 
 # db connectors
 db_connector = None
@@ -114,6 +118,25 @@ user = 'Ucibeez'
 password = 'Remedix@2023!'
 download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
 download_pod_from_server_dir = '/var/www/html/order-capture-implementation/storage/pods/Remedix/'
+
+import socket
+
+def get_running_server_ip():
+    try:
+        # Create a dummy socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("google.com", 80))  # Connect to a remote server (e.g., google.com) with a known IP
+
+        # Get the socket address
+        ip_address = sock.getsockname()[0]
+
+        # Close the dummy socket
+        sock.close()
+
+        return ip_address
+    except socket.error as e:
+        print(f"Error retrieving server IP: {e}")
+        return None
 
 
 def dss_load_config():
@@ -230,8 +253,53 @@ def init_db():
     
     
 """
+
+def exec_cmdline(cmd):
+
+    if _platform == 'darwin': # running from MAC
+        # SSH command to execute
+        ssh_command = "ssh pessyhollander@app.cibeez.dev.helmes.ee " + cmd
+        # Execute the SSH command
+        try:
+            result = subprocess.check_output(ssh_command, shell=True)
+            print(result.decode())
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing SSH command: {e}")
+            return False
+    else: # from local machine
+        try:
+            result = subprocess.check_output(cmd, shell=True)
+            print(result.decode())
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing shell command: {e}")
+            return False
+
+    return True
+
+
+
+
 def run_cvrp_automation(downloaded_file):
     print('soon...')
+
+def run_mk_pdf(db_connector, o_req_uid):
+    ret_exec = False
+    # first get all orders delivered today
+    order_list = pd.DataFrame()
+    this_sql = 'SELECT id, o_external_id, o_order_state, updated_at FROM orders WHERE o_order_state IN (8,15) \
+    AND o_req_uid = {0} AND DATE(updated_at)="{1}";'.format(o_req_uid,dt.datetime.now().strftime("%Y-%m-%d"))
+    try:
+        order_list = pd.read_sql(this_sql, db_connector)
+        if not order_list.empty:
+            orders_ids = ('"' + str(order_list['id'].tolist()) + '"').replace('[', '').replace(']', '')
+            upload_cmd = '\'cd /var/www/html/order-capture-implementation;  php artisan pod:save ' + orders_ids + "'"
+            ret_exec = exec_cmdline(upload_cmd)
+        else:
+            logging.warning(f'rea_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
+    except Exception as e:
+        logging.error(f'run_mk_pdf() exception: {e}')
+
+    return ret_exec
 
 
 #Auth types: user_pass, key_only, key_and_pass
@@ -294,10 +362,17 @@ def download_from_remedix(sftp):
                 local_dir = './download/'
             else:
                 local_dir = download_to_server_dir
-            sftp.get(download_this, '{0}{1}'.format(local_dir, download_this))
-            msg = "{0} downloaded to {1}".format(download_this, local_dir)
-            print(msg)
-            logging.debug(msg)
+            try:
+                sftp.get(download_this, '{0}{1}'.format(local_dir, download_this))
+                msg = "{0} downloaded to {1}".format(download_this, local_dir)
+                print(msg)
+                logging.debug(msg)
+            except Exception as e:
+                msg = f'sftp.get() Exception: {e}'
+                print(msg)
+                logging.debug(msg)
+                return False, None
+
             return True, download_this
         else:
             msg = "Nothing to download..."
@@ -306,7 +381,26 @@ def download_from_remedix(sftp):
             return False, None
     return False, None
 
+def upload_pod_to_remedix(sftp):
+    if sftp:
+        try:
+            today = dt.datetime.now().strftime("%d%m%y")
+            sftp.put(f'/var/www/html/order-capture-implementation/storage/pods/Remedix/*_{today}', '/From Cibeez/.' )
+            msg = f'Uploaded pods to remedix for today: {today}'
+            print(msg)
+            logging.debug(msg)
+        except Exception as e:
+            msg = f'sftp.get() Exception: {e}'
+            print(msg)
+            logging.debug(msg)
+            return False
+    return True
+
 if __name__ == "__main__":
+
+    action = None
+    if len(sys.argv) > 1:
+        action = sys.argv[1]
 
     python_ver = str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
     _python39 = int(python_ver.split('.')[1]) >= 9  # means >= '3.9.xxx'
@@ -315,6 +409,11 @@ if __name__ == "__main__":
                         format="%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
+
+    server_ip = get_running_server_ip()
+    prod_server_ip = '95.215.132.73' == server_ip
+    if server_ip:
+        logging.info(f"The IP address of the running server is: {server_ip}, {'prod' if prod_server_ip else 'dev'} server")
 
     ok_cnf, dss_config = dss_load_config()
 
@@ -325,9 +424,16 @@ if __name__ == "__main__":
     download_file = 'CiBeez' + '_NEXTDAY_' + today
     sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
-        ok_download, file_name = download_from_remedix(sftp)
+        if not action or action == 'download':
+            ok_download, file_name = download_from_remedix(sftp)
+        elif not action or action == 'upload':
+            ok_mk_pdf = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
+            if ok_mk_pdf: # upload
+                ok_upload = upload_pod_to_remedix(sftp)
+
 
     logging.debug("Done.")
+    print("Done.")
 
 
 
