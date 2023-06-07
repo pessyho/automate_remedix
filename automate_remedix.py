@@ -53,7 +53,6 @@ download_to_server_dir = None
 upload_pod_from_server_dir = None
 artisan_dir = None
 
-import socket
 
 def cmdline():
     parser = argparse.ArgumentParser()
@@ -201,16 +200,16 @@ def exec_subprocess(cmd):
             print(result.decode())
         except subprocess.CalledProcessError as e:
             print(f"Error executing SSH command: {e}")
-            return False
+            return False, None
     else: # from local machine
         try:
             result = subprocess.check_output(cmd, shell=True)
             print(result.decode())
         except subprocess.CalledProcessError as e:
             print(f"Error executing shell command: {e}")
-            return False
+            return False, None
 
-    return True
+    return True, result
 
 
 """
@@ -227,8 +226,8 @@ def exec_subprocess(cmd):
 """
 def run_cvrp(downloaded_file):
     cvrp_cmd = '\'cd '+artisan_dir+';  php artisan remedix:tocvrp ' + download_to_server_dir + downloaded_file +"'"
-    ret_exec = exec_subprocess(cvrp_cmd)
-    return ret_exec
+    ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
+    return ok_exec, ret_exec
 
 
 """
@@ -264,7 +263,8 @@ PDF artisan
 
 """
 def run_mk_pdf(db_connector, o_req_uid):
-    ret_exec = False
+    ret_exec = None
+    ok_exec = False
     # first get all orders delivered today
     order_list = pd.DataFrame()
     this_sql = 'SELECT id, o_external_id, o_order_state, updated_at FROM orders WHERE o_order_state IN (8,15) \
@@ -276,14 +276,15 @@ def run_mk_pdf(db_connector, o_req_uid):
             logging.debug(f'pdf order list {orders_ids}')
             upload_cmd = '\'cd '+artisan_dir+';  php artisan pod:save ' + orders_ids + "'"
             logging.debug(f'exceuting upload cmd:  {upload_cmd}')
-            ret_exec = exec_subprocess(upload_cmd)
-            logging.debug(f'exec_subprocess() response:   {ret_exec}')
+            ok_exec, ret_exec = exec_subprocess(upload_cmd)
+            logging.debug(f'exec_subprocess() {ok_exec} response:   {ret_exec}')
         else:
             logging.warning(f'read_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
     except Exception as e:
         logging.error(f'run_mk_pdf() exception: {e}')
 
-    return ret_exec
+
+    return ok_exec, ret_exec
 
 
 #Auth types: user_pass, key_only, key_and_pass
@@ -322,6 +323,7 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
 """
 def download_from_remedix(sftp):
 
+
     if sftp:
 
         remote_files = sftp.listdir('From remedix')  # list files in dir
@@ -346,7 +348,9 @@ def download_from_remedix(sftp):
             # download file
             if _platform == 'darwin': # on my MAC
                 download_cmd = 'sshpass -p '+ password + ' sftp '+ user+ '@'+host+':"/From\ Remedix/"'  + download_this +  ' '+ download_to_server_dir
-                ret_exec = exec_subprocess(download_cmd)
+                ok_exec, ret_exec = exec_subprocess(download_cmd)
+                if not ok_exec:
+                    return False, None
             else:
                 local_dir = download_to_server_dir
                 try:
@@ -366,6 +370,7 @@ def download_from_remedix(sftp):
             print(msg)
             logging.debug(msg)
             return False, None
+
     return False, None
 
 def upload_pod_to_remedix(sftp):
@@ -423,12 +428,13 @@ if __name__ == "__main__":
             if cmd == 'download' and val:
                 ok_download, remedix_input_file = download_from_remedix(sftp)
             elif cmd == 'pdf' and val:
-                ok_mk_pdf = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
+                ok_mk_pdf, ret_exec = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
             elif cmd == 'upload' and val:
                 ok_upload = upload_pod_to_remedix(sftp)
             elif cmd == 'cvrp' and val:
                 ok_cvrp = run_cvrp(remedix_input_file)
 
+        sftp.close()
 
     logging.debug("Done.")
     print("Done.")
