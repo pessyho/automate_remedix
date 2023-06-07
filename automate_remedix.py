@@ -382,7 +382,7 @@ def upload_pod_to_remedix(sftp):
                     if (f'{today}.pdf') in entry.name:
                         upload_file = f'{upload_pod_from_server_dir}{entry.name}'
                         print(upload_file)
-                        sftp.put(upload_file, '/From\ Cibeez/.' )
+                        sftp.put(upload_file, f'/From\ Cibeez/{entry.name}')
                         msg = f'Uploaded pod file {entry.name} to remedix for today: {today}'
                         print(msg)
                         logging.debug(msg)
