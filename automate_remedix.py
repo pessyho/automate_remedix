@@ -11,79 +11,10 @@
     0.9 beta initial
     1.0 initial version - db + config init, download from server to server
     1.1 run_mk_pdf  & upload_pods_to_remedix
+    1.2 added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
 
 """
 
-
-"""
-    Execute automated script after download:
-    
-    1. go to directory /var/www/html/order-capture-implementation
-    2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
-
-"""
-
-"""
-
-PDF artisan
-
-    1. cd /var/www/html/order-capture-implementation
-    2. pod:save "10141784,10151082,5555555555,10186911,10189742,10184283,8924338"
-    
-markallanconrad@app:/var/www/html/order-capture-implementation$ php artisan pod:save "10141784,10151082,5555555555,10186911,10189742,10184283,8924338"
-Array
-(
-    [status] => OK
-    [stored] => 4
-    [dir] => /var/www/html/order-capture-implementation/storage/pods/Remedix
-    [pods] => Array
-        (
-            [0] => Array
-                (
-                    [0] => 10141784
-                    [1] => /var/www/html/order-capture-implementation/storage/pods/Remedix/20230518_10141784.pdf
-                )
-
-            [1] => Array
-                (
-                    [0] => 10151082
-                    [1] => /var/www/html/order-capture-implementation/storage/pods/Remedix/20230518_10151082.pdf
-                )
-
-            [2] => Array
-                (
-                    [0] => 5555555555
-                    [1] => order not found
-                )
-
-            [3] => Array
-                (
-                    [0] => 10186911
-                    [1] => /var/www/html/order-capture-implementation/storage/pods/Remedix/20230518_10186911.pdf
-                )
-
-            [4] => Array
-                (
-                    [0] => 10189742
-                    [1] => /var/www/html/order-capture-implementation/storage/pods/Remedix/20230518_10189742.pdf
-                )
-
-            [5] => Array
-                (
-                    [0] => 10184283
-                    [1] => order is not from Remedix
-                )
-
-            [6] => Array
-                (
-                    [0] => 8924338
-                    [1] => pod not found
-                )
-
-        )
-
-)
-"""
 
 import paramiko
 import logging
@@ -100,9 +31,10 @@ import fnmatch
 import subprocess
 import socket
 import pandas as pd
+import argparse
 
 
-sftp_remedix_v = '1.1'
+_VERSION = '1.2'
 
 # db connectors
 db_connector = None
@@ -120,6 +52,16 @@ download_to_server_dir = '/var/www/html/order-capture-implementation/storage/rem
 download_pod_from_server_dir = '/var/www/html/order-capture-implementation/storage/pods/Remedix/'
 
 import socket
+
+def cmdline():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version='%(prog)s {}'.format(_VERSION))
+    parser.add_argument('--download', '-D', action='store_true', help='download remedix input file')
+    parser.add_argument('--pdf', '-P', action='store_true', help='create pdf files')
+    parser.add_argument('--upload', '-U', action='store_true', help='upload pdf ouput files')
+    parser.add_argument('--cvrp', '-C', action='store_true', help='run cvrp')
+    return parser.parse_args()
+
 
 def get_running_server_ip():
     try:
@@ -148,10 +90,6 @@ def dss_load_config():
 
     with open(dss_config_file) as json_data_file:
         data = json.load(json_data_file)
-
-    #global _dev
-    #_dev = data.get('dss-locker-url').find('dev') != -1
-    #mylog('dss-server running on {} env'.format("DEV" if _dev else "PROD"), 'debug')
 
 
     return True, data
@@ -240,21 +178,8 @@ def init_db():
 
     return db_connector, ssh_tunnel_host, server
 
-"""
-    run_cvrp_automation(file_name) . Execute automated script  after download:
-    
-        input: file_name, the downloaded file name, str
-        output: success, True/False
-        
-    1. go to directory /var/www/html/order-capture-implementation
-    2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
-    {foldername} is 
-    download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
-    
-    
-"""
 
-def exec_cmdline(cmd):
+def exec_subprocess(cmd):
 
     if _platform == 'darwin': # running from MAC
         # SSH command to execute
@@ -277,11 +202,56 @@ def exec_cmdline(cmd):
     return True
 
 
+"""
+    run_cvrp(file_name) . Execute automated script  after download:
+
+        input: file_name, the downloaded file name, str
+        output: success, True/False
+
+    1. go to directory /var/www/html/order-capture-implementation
+    2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
+    {foldername} is 
+    download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
+
+"""
+def run_cvrp(downloaded_file):
+    cvrp_cmd = '\'cd /var/www/html/order-capture-implementation;  php artisan remedix:tocvrp ' + download_to_server_dir + downloaded_file +"'"
+    ret_exec = exec_subprocess(cmd)
+    return ret_exec
 
 
-def run_cvrp_automation(downloaded_file):
-    print('soon...')
+"""
 
+PDF artisan
+
+    1. cd /var/www/html/order-capture-implementation
+    2. pod:save "10141784,10151082,5555555555,10186911,10189742,10184283,8924338"
+
+    {
+          "status": "OK",
+          "stored": 4,
+          "dir": "/var/www/html/order-capture-implementation/storage/pods/Remedix",
+          "pods": [
+            [
+              "991831920",
+              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8M23018650_20230531.pdf"
+            ],
+            [
+              " 991831921",
+              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8M23018652_20230531.pdf"
+            ],
+            [
+              " 991840694",
+              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8U21035594_20230531.pdf"
+            ],
+            [
+              " 991840695",
+              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8U21035723_20230531.pdf"
+            ]
+          ]
+    }
+
+"""
 def run_mk_pdf(db_connector, o_req_uid):
     ret_exec = False
     # first get all orders delivered today
@@ -293,7 +263,7 @@ def run_mk_pdf(db_connector, o_req_uid):
         if not order_list.empty:
             orders_ids = ('"' + str(order_list['id'].tolist()) + '"').replace('[', '').replace(']', '')
             upload_cmd = '\'cd /var/www/html/order-capture-implementation;  php artisan pod:save ' + orders_ids + "'"
-            ret_exec = exec_cmdline(upload_cmd)
+            ret_exec = exec_subprocess(upload_cmd)
         else:
             logging.warning(f'rea_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
     except Exception as e:
@@ -336,14 +306,15 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
     download_from_remedix
 """
 def download_from_remedix(sftp):
+
     if sftp:
 
         remote_files = sftp.listdir('From remedix')  # list files in dir
         f_size = 0
         f_time = 0
 
-        #file_pattern = 'CiBeez_NEXTDAY_{0}*.txt'.format(dt.datetime.now().strftime("%d%m%y"))
-        file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
+        # file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
+        file_pattern = 'CiBeez_NEXTDAY_{0}*.txt'.format(dt.datetime.now().strftime("%d%m%y"))
         selected_files = fnmatch.filter(remote_files, file_pattern)
 
         if selected_files != []:
@@ -359,19 +330,21 @@ def download_from_remedix(sftp):
             logging.debug(msg)
             # download file
             if _platform == 'darwin': # on my MAC
-                local_dir = './download/'
+                download_cmd = 'sshpass -p Remedix@2023! sftp Ucibeez@remedix.packetauth.com:"/From\ Remedix/CiBeez_NEXTDAY_310523*.txt" /var/www/html/order-capture-implementation/storage/remedixfiles/'
+                # 'sshpass -p Remedix@2023! sftp Ucibeez@remedix.packetauth.com 22'
+                ret_exec = exec_subprocess(download_cmd)
             else:
                 local_dir = download_to_server_dir
-            try:
-                sftp.get(download_this, '{0}{1}'.format(local_dir, download_this))
-                msg = "{0} downloaded to {1}".format(download_this, local_dir)
-                print(msg)
-                logging.debug(msg)
-            except Exception as e:
-                msg = f'sftp.get() Exception: {e}'
-                print(msg)
-                logging.debug(msg)
-                return False, None
+                try:
+                    sftp.get(download_this, '{0}{1}'.format(local_dir, download_this))
+                    msg = "{0} downloaded to {1}".format(download_this, local_dir)
+                    print(msg)
+                    logging.debug(msg)
+                except Exception as e:
+                    msg = f'sftp.get() Exception: {e}'
+                    print(msg)
+                    logging.debug(msg)
+                    return False, None
 
             return True, download_this
         else:
@@ -398,13 +371,11 @@ def upload_pod_to_remedix(sftp):
 
 if __name__ == "__main__":
 
-    action = None
-    if len(sys.argv) > 1:
-        action = sys.argv[1]
+    args = cmdline()
 
     python_ver = str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
     _python39 = int(python_ver.split('.')[1]) >= 9  # means >= '3.9.xxx'
-    print('sftp_remedix version: {0}, python version: {1}'.format(sftp_remedix_v,python_ver ))
+    print('sftp_remedix version: {0}, python version: {1}'.format(_VERSION, python_ver ))
     logging.basicConfig(filename='./log/sftp_remedix.log',
                         format="%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
     logger = logging.getLogger()
@@ -416,20 +387,20 @@ if __name__ == "__main__":
         logging.info(f"The IP address of the running server is: {server_ip}, {'prod' if prod_server_ip else 'dev'} server")
 
     ok_cnf, dss_config = dss_load_config()
-
     db_connector, ssh_tunnel_host, server = init_db()
     today = dt.datetime.now().strftime("%d%m%y")
-    #download_file = 'CiBeez_140523'
-    #download_file = 'CiBeez_' + today  # this is for testing
-    download_file = 'CiBeez' + '_NEXTDAY_' + today
+    remedix_input_file = None
     sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
-        if not action or action == 'download':
-            ok_download, file_name = download_from_remedix(sftp)
-        elif not action or action == 'upload':
-            ok_mk_pdf = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
-            if ok_mk_pdf: # upload
+        for cmd in vars(args):
+            if cmd == 'download':
+                ok_download, remedix_input_file = download_from_remedix(sftp)
+            elif cmd == 'pdf':
+                ok_mk_pdf = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
+            elif cmd == 'upload':
                 ok_upload = upload_pod_to_remedix(sftp)
+            elif cmd == 'cvrp':
+                ok_cvrp = run_cvrp(remedix_input_file)
 
 
     logging.debug("Done.")
