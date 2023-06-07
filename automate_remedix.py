@@ -12,6 +12,7 @@
     1.0 initial version - db + config init, download from server to server
     1.1 run_mk_pdf  & upload_pods_to_remedix
     1.2 added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
+    1.3 credentials and dirs in config
 
 """
 
@@ -34,7 +35,7 @@ import pandas as pd
 import argparse
 
 
-_VERSION = '1.2'
+_VERSION = '1.3'
 
 # db connectors
 db_connector = None
@@ -44,12 +45,13 @@ dss_config = None
 _python39 = False
 
 
-port = 22
-host = 'remedix.packetauth.com'
-user = 'Ucibeez'
-password = 'Remedix@2023!'
-download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
-download_pod_from_server_dir = '/var/www/html/order-capture-implementation/storage/pods/Remedix/'
+port = None
+host = None
+user = None
+password = None
+download_to_server_dir = None
+upload_pod_from_server_dir = None
+artisan_dir = None
 
 import socket
 
@@ -81,16 +83,25 @@ def get_running_server_ip():
         return None
 
 
-def dss_load_config():
-    wd = os.environ.get('DSS_WD', '.')
-    dss_config_file = os.path.join(wd, "config/dss-config.json")
-    if not os.path.isfile(dss_config_file):
-        logging.error('ERR missing dss-config.json configuraion file ')
+def load_config(dss=False):
+
+    config_file = None
+    try:
+        if not dss:
+            wd = os.getcwd()
+            config_file = os.path.join(wd, "config/automate_rx.json")
+        else:
+            wd = os.environ.get('DSS_WD', '.')
+            config_file = os.path.join(wd, "config/dss-config.json")
+        if not os.path.isfile(config_file):
+            logging.error('ERR missing automate_rx.json configuraion file ')
+            return False, None
+
+        with open(config_file) as json_data_file:
+            data = json.load(json_data_file)
+    except Exception as e:
+        logging.error(f'load_config(dss={dss}) Exception: {e} ')
         return False, None
-
-    with open(dss_config_file) as json_data_file:
-        data = json.load(json_data_file)
-
 
     return True, data
 
@@ -215,8 +226,8 @@ def exec_subprocess(cmd):
 
 """
 def run_cvrp(downloaded_file):
-    cvrp_cmd = '\'cd /var/www/html/order-capture-implementation;  php artisan remedix:tocvrp ' + download_to_server_dir + downloaded_file +"'"
-    ret_exec = exec_subprocess(cmd)
+    cvrp_cmd = '\'cd '+artisan_dir+';  php artisan remedix:tocvrp ' + download_to_server_dir + downloaded_file +"'"
+    ret_exec = exec_subprocess(cvrp_cmd)
     return ret_exec
 
 
@@ -262,7 +273,7 @@ def run_mk_pdf(db_connector, o_req_uid):
         order_list = pd.read_sql(this_sql, db_connector)
         if not order_list.empty:
             orders_ids = ('"' + str(order_list['id'].tolist()) + '"').replace('[', '').replace(']', '')
-            upload_cmd = '\'cd /var/www/html/order-capture-implementation;  php artisan pod:save ' + orders_ids + "'"
+            upload_cmd = '\'cd '+artisan_dir+';  php artisan pod:save ' + orders_ids + "'"
             ret_exec = exec_subprocess(upload_cmd)
         else:
             logging.warning(f'rea_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
@@ -330,8 +341,7 @@ def download_from_remedix(sftp):
             logging.debug(msg)
             # download file
             if _platform == 'darwin': # on my MAC
-                download_cmd = 'sshpass -p Remedix@2023! sftp Ucibeez@remedix.packetauth.com:"/From\ Remedix/CiBeez_NEXTDAY_310523*.txt" /var/www/html/order-capture-implementation/storage/remedixfiles/'
-                # 'sshpass -p Remedix@2023! sftp Ucibeez@remedix.packetauth.com 22'
+                download_cmd = 'sshpass -p '+ password + ' sftp '+ user+ '@'+host+':"/From\ Remedix/"'  + download_this +  ' '+ download_to_server_dir
                 ret_exec = exec_subprocess(download_cmd)
             else:
                 local_dir = download_to_server_dir
@@ -358,7 +368,7 @@ def upload_pod_to_remedix(sftp):
     if sftp:
         try:
             today = dt.datetime.now().strftime("%d%m%y")
-            sftp.put(f'/var/www/html/order-capture-implementation/storage/pods/Remedix/*_{today}', '/From Cibeez/.' )
+            sftp.put(f'{upload_pod_from_server_dir}*_{today}', '/From\ Cibeez/.' )
             msg = f'Uploaded pods to remedix for today: {today}'
             print(msg)
             logging.debug(msg)
@@ -386,20 +396,33 @@ if __name__ == "__main__":
     if server_ip:
         logging.info(f"The IP address of the running server is: {server_ip}, {'prod' if prod_server_ip else 'dev'} server")
 
-    ok_cnf, dss_config = dss_load_config()
+    ok_config, configs = load_config()
+    ok_config_dss, dss_config = load_config(True)
+    if not ok_config or not ok_config_dss:
+        print("cant load config file, terminating ...")
+        exit()
+    port = int(configs.get('auth').get('port'))
+    host = configs.get('auth').get('host')
+    user = configs.get('auth').get('user')
+    password = configs.get('auth').get('password')
+    download_to_server_dir = configs.get('dir').get('download_to_server_dir')
+    download_pod_from_server_dir = configs.get('dir').get('download_pod_from_server_dir')
+    artisan_dir = configs.get('dir').get('artisan_dir')
+
+
     db_connector, ssh_tunnel_host, server = init_db()
     today = dt.datetime.now().strftime("%d%m%y")
     remedix_input_file = None
     sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
-        for cmd in vars(args):
-            if cmd == 'download':
+        for cmd, val in vars(args).items():
+            if cmd == 'download' and val:
                 ok_download, remedix_input_file = download_from_remedix(sftp)
-            elif cmd == 'pdf':
+            elif cmd == 'pdf' and val:
                 ok_mk_pdf = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
-            elif cmd == 'upload':
+            elif cmd == 'upload' and val:
                 ok_upload = upload_pod_to_remedix(sftp)
-            elif cmd == 'cvrp':
+            elif cmd == 'cvrp' and val:
                 ok_cvrp = run_cvrp(remedix_input_file)
 
 
