@@ -274,7 +274,7 @@ def run_mk_pdf(db_connector, o_req_uid):
         if not order_list.empty:
             orders_ids = ('"' + str(order_list['id'].tolist()) + '"').replace('[', '').replace(']', '')
             logging.debug(f'pdf order list {orders_ids}')
-            upload_cmd = 'cd '+artisan_dir+';  php artisan pod:save "' + orders_ids + '"'
+            upload_cmd = 'cd '+artisan_dir+';  php artisan pod:save ' + orders_ids
             logging.debug(f'exceuting upload cmd:  {upload_cmd}')
             ok_exec, ret_exec = exec_subprocess(upload_cmd)
             logging.debug(f'exec_subprocess() {ok_exec} response:   {ret_exec}')
