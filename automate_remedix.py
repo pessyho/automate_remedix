@@ -376,8 +376,8 @@ def download_from_remedix(sftp):
 def upload_pod_to_remedix(sftp):
     if sftp:
         try:
-            today = dt.datetime.now().strftime("%d%m%y")
-            sftp.put(f'{upload_pod_from_server_dir}*_{today}', '/From\ Cibeez/.' )
+            today = dt.datetime.now().strftime("%Y%m%y")
+            sftp.put(f'{upload_pod_from_server_dir}*_{today}.pdf', '/From\ Cibeez/.' )
             msg = f'Uploaded pods to remedix for today: {today}'
             print(msg)
             logging.debug(msg)
