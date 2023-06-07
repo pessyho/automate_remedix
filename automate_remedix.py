@@ -309,9 +309,10 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
             print(msg)
         sftp = paramiko.SFTPClient.from_transport(transport)
     except Exception as e:
-        msg = "sfpt exception: {}".format(e)
-        logging.log(logging.WARNING, msg)
+        msg = f'sfpt exception: {e}'
+        logging.error(msg)
         print(msg)
+        return None, None
 
     return sftp, transport
 
