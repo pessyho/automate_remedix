@@ -273,8 +273,11 @@ def run_mk_pdf(db_connector, o_req_uid):
         order_list = pd.read_sql(this_sql, db_connector)
         if not order_list.empty:
             orders_ids = ('"' + str(order_list['id'].tolist()) + '"').replace('[', '').replace(']', '')
+            logging.debug(f'pdf order list {orders_ids}')
             upload_cmd = '\'cd '+artisan_dir+';  php artisan pod:save ' + orders_ids + "'"
+            logging.debug(f'exceuting upload cmd:  {upload_cmd}')
             ret_exec = exec_subprocess(upload_cmd)
+            logging.debug(f'exec_subprocess() response:   {ret_exec}')
         else:
             logging.warning(f'rea_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
     except Exception as e:
