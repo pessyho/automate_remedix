@@ -385,8 +385,8 @@ if __name__ == "__main__":
 
     python_ver = str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
     _python39 = int(python_ver.split('.')[1]) >= 9  # means >= '3.9.xxx'
-    print('sftp_remedix version: {0}, python version: {1}'.format(_VERSION, python_ver ))
-    logging.basicConfig(filename='./log/sftp_remedix.log',
+    print('automate_remedix version: {0}, python version: {1}'.format(_VERSION, python_ver ))
+    logging.basicConfig(filename='./log/automate_remedix.log',
                         format="%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -406,7 +406,7 @@ if __name__ == "__main__":
     user = configs.get('auth').get('user')
     password = configs.get('auth').get('password')
     download_to_server_dir = configs.get('dir').get('download_to_server_dir')
-    download_pod_from_server_dir = configs.get('dir').get('download_pod_from_server_dir')
+    upload_pod_from_server_dir = configs.get('dir').get('upload_pod_from_server_dir')
     artisan_dir = configs.get('dir').get('artisan_dir')
 
 
