@@ -279,7 +279,7 @@ def run_mk_pdf(db_connector, o_req_uid):
             ret_exec = exec_subprocess(upload_cmd)
             logging.debug(f'exec_subprocess() response:   {ret_exec}')
         else:
-            logging.warning(f'rea_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
+            logging.warning(f'read_sql returned empty, no pod found to upload to remedix. (sql: {this_sql})')
     except Exception as e:
         logging.error(f'run_mk_pdf() exception: {e}')
 
@@ -396,7 +396,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
 
     server_ip = get_running_server_ip()
-    prod_server_ip = '95.215.132.73' == server_ip
+    prod_server_ip = '10.200.4.214' == server_ip
     if server_ip:
         logging.info(f"The IP address of the running server is: {server_ip}, {'prod' if prod_server_ip else 'dev'} server")
 
