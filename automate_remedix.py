@@ -385,7 +385,7 @@ def upload_pod_to_remedix(sftp):
                         msg = f'Upload pod file: {local_path_file} to remedix: {remote_file}'
                         print(msg)
                         logging.debug(msg)
-                        sftp.put(local_path_file, remote_file )
+                        sftp.put(local_path_file, remote_file, confirm=False )
                         msg = f'Uploaded pod file {entry.name} to remedix for today: {today}'
                         print(msg)
                         logging.debug(msg)
