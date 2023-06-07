@@ -377,12 +377,15 @@ def upload_pod_to_remedix(sftp):
     if sftp:
         try:
             today = dt.datetime.now().strftime("%Y%m%d")
-            sftp.put(f'{upload_pod_from_server_dir}*_{today}.pdf', '/From\ Cibeez/.' )
-            msg = f'Uploaded pods to remedix for today: {today}'
-            print(msg)
-            logging.debug(msg)
+            with os.scandir(upload_pod_from_server_dir) as entries:
+                for entry in entries:
+                    if (f'{today}.pdf') in entry:
+                        sftp.put(f'{upload_pod_from_server_dir}{entry}', '/From\ Cibeez/.' )
+                        msg = f'Uploaded pod file {entry} to remedix for {today}'
+                        print(msg)
+                        logging.debug(msg)
         except Exception as e:
-            msg = f'sftp.get() Exception: {e}'
+            msg = f'sftp.put() Exception: {e}'
             print(msg)
             logging.debug(msg)
             return False
