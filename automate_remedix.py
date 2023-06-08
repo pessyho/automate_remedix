@@ -229,7 +229,7 @@ def exec_subprocess(cmd):
 
 """
 def run_cvrp(downloaded_file):
-    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {download_to_server_dir}/{downloaded_file}'
+    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {download_to_server_dir}{downloaded_file}'
     ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
     return ok_exec, ret_exec
 
