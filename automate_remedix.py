@@ -400,7 +400,7 @@ def upload_pod_to_remedix(sftp, this_date):
     if not this_date:
         #this_date = dt.datetime.now().strftime("%Y%m%d")
         #format from %d%m%y to "%Y%m%d"
-        this_date = dt.datetime.strptime(this_date, '%d%m%y').strftime('%Y%m%d')
+        this_date = dt.datetime.now().strftime("%Y%m%d")
 
     if sftp:
         try:
