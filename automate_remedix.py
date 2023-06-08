@@ -8,11 +8,12 @@
     An sftp process to download the remedix input file, and upload the POD daily data in pdf format
     Also calls an artisan script to autmate the entire upload,validation and cvrp process of remedix
 
-    0.9 beta initial
-    1.0 initial version - db + config init, download from server to server
-    1.1 run_mk_pdf  & upload_pods_to_remedix
-    1.2 added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
-    1.3 credentials and dirs in config
+    0.9     beta initial
+    1.0     initial version - db + config init, download from server to server
+    1.1     run_mk_pdf  & upload_pods_to_remedix
+    1.2     added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
+    1.3     credentials and dirs in config
+    1.3.1   optional date parameter to cmds
 
 """
 
@@ -35,7 +36,7 @@ import pandas as pd
 import argparse
 
 
-_VERSION = '1.3'
+_VERSION = '1.3.1'
 
 # db connectors
 db_connector = None
@@ -57,10 +58,12 @@ artisan_dir = None
 def cmdline():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='%(prog)s {}'.format(_VERSION))
-    parser.add_argument('--download', '-D', action='store_true', help='download remedix input file')
-    parser.add_argument('--pdf', '-P', action='store_true', help='create pdf files')
-    parser.add_argument('--upload', '-U', action='store_true', help='upload pdf ouput files')
-    parser.add_argument('--cvrp', '-C', action='store_true', help='run cvrp')
+    #parser.add_argument('--date', '-C', action='store_true', help='run cvrp')
+    #parser.add_argument('--download', '-D', action='store_true', help='download remedix input file')
+    parser.add_argument('--download', '-D', nargs='?', const=True, type=str, help='download remedix input file')
+    parser.add_argument('--pdf', '-P', nargs='?', const=True, type=str, help='create pdf files')
+    parser.add_argument('--upload', '-U', nargs='?', const=True, type=str, help='upload pdf ouput files')
+    parser.add_argument('--cvrp', '-C', nargs='?', const=True, type=str, help='run cvrp')
     return parser.parse_args()
 
 
@@ -262,13 +265,19 @@ PDF artisan
     }
 
 """
-def run_mk_pdf(db_connector, o_req_uid):
+def run_mk_pdf(db_connector, o_req_uid, this_date):
     ret_exec = None
     ok_exec = False
     # first get all orders delivered today
     order_list = pd.DataFrame()
+    if not this_date:
+        this_date = dt.datetime.now().strftime("%Y-%m-%d")
+    else:
+        #format from %d%m%y to "%Y-%m-%d"
+        this_date = datetime.datetime.strptime(this_date, '%d%m%y').strftime('%Y-%m-%d')
+
     this_sql = 'SELECT id, o_external_id, o_order_state, updated_at FROM orders WHERE o_order_state IN (8,15) \
-    AND o_req_uid = {0} AND DATE(updated_at)="{1}";'.format(o_req_uid,dt.datetime.now().strftime("%Y-%m-%d"))
+    AND o_req_uid = {0} AND DATE(updated_at)="{1}";'.format(o_req_uid, this_date)
     try:
         order_list = pd.read_sql(this_sql, db_connector)
         if not order_list.empty:
@@ -321,7 +330,7 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
 """
     download_from_remedix
 """
-def download_from_remedix(sftp):
+def download_from_remedix(sftp,this_date=None):
 
 
     if sftp:
@@ -330,8 +339,10 @@ def download_from_remedix(sftp):
         f_size = 0
         f_time = 0
 
-        # file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
-        file_pattern = 'CiBeez_NEXTDAY_{0}*.txt'.format(dt.datetime.now().strftime("%d%m%y"))
+        if not this_date:
+            this_date = dt.datetime.now().strftime("%d%m%y")
+        #file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
+        file_pattern = f'CiBeez_NEXTDAY_{this_date}*.txt'
         selected_files = fnmatch.filter(remote_files, file_pattern)
 
         if selected_files != []:
@@ -347,7 +358,7 @@ def download_from_remedix(sftp):
             logging.debug(msg)
             # download file
             if _platform == 'darwin': # on my MAC
-                download_cmd = 'sshpass -p '+ password + ' sftp '+ user+ '@'+host+':"/From\ Remedix/"'  + download_this +  ' '+ download_to_server_dir
+                download_cmd = f'sshpass -p {password} sftp {user}@{host}:"/From\ Remedix/{download_this}" {download_to_server_dir}'
                 ok_exec, ret_exec = exec_subprocess(download_cmd)
                 if not ok_exec:
                     return False, None
@@ -373,10 +384,16 @@ def download_from_remedix(sftp):
 
     return False, None
 
-def upload_pod_to_remedix(sftp):
+def upload_pod_to_remedix(sftp, this_date):
+    count = 0
+    if not this_date:
+        #this_date = dt.datetime.now().strftime("%Y%m%d")
+        #format from %d%m%y to "%Y%m%d"
+        this_date = datetime.datetime.strptime(this_date, '%d%m%y').strftime('%Y%m%d')
+
     if sftp:
         try:
-            today = dt.datetime.now().strftime("%Y%m%d")
+            #today = dt.datetime.now().strftime("%Y%m%d")
             with os.scandir(upload_pod_from_server_dir) as entries:
                 for entry in entries:
                     if (f'{today}.pdf') in entry.name:
@@ -386,14 +403,18 @@ def upload_pod_to_remedix(sftp):
                         print(msg)
                         logging.debug(msg)
                         sftp.put(local_path_file, remote_file, confirm=False )
-                        msg = f'Uploaded pod file {entry.name} to remedix for today: {today}'
+                        msg = f'Uploaded pod file {entry.name} to remedix for today: {this_date}'
                         print(msg)
                         logging.debug(msg)
+                        count += 1
         except Exception as e:
             msg = f'sftp.put() Exception: {e}'
             print(msg)
             logging.debug(msg)
             return False
+    msg = f'Uploaded total of {count} pod files to remedix for today: {this_date}'
+    print(msg)
+    logging.debug(msg)
     return True
 
 if __name__ == "__main__":
@@ -428,18 +449,20 @@ if __name__ == "__main__":
 
 
     db_connector, ssh_tunnel_host, server = init_db()
-    today = dt.datetime.now().strftime("%d%m%y")
+    #today = dt.datetime.now().strftime("%d%m%y")
     remedix_input_file = None
     sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
         for cmd, val in vars(args).items():
-            if cmd == 'download' and val:
-                ok_download, remedix_input_file = download_from_remedix(sftp)
-            elif cmd == 'pdf' and val:
-                ok_mk_pdf, ret_exec = run_mk_pdf(db_connector, 87 if prod_server_ip else 83)
-            elif cmd == 'upload' and val:
-                ok_upload = upload_pod_to_remedix(sftp)
-            elif cmd == 'cvrp' and val:
+            # NOTE: format for all date is "%d%m%y"
+            this_date = val if isinstance(val, str) else None
+            if cmd == 'download':
+                ok_download, remedix_input_file = download_from_remedix(sftp, this_date)
+            elif cmd == 'pdf':
+                ok_mk_pdf, ret_exec = run_mk_pdf(db_connector, 87 if prod_server_ip else 83, this_date)
+            elif cmd == 'upload':
+                ok_upload = upload_pod_to_remedix(sftp, this_date)
+            elif cmd == 'cvrp':
                 ok_cvrp = run_cvrp(remedix_input_file)
 
         sftp.close()
