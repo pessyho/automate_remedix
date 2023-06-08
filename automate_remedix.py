@@ -197,20 +197,26 @@ def exec_subprocess(cmd):
 
     if _platform == 'darwin': # running from MAC
         # SSH command to execute
-        ssh_command = "ssh pessyhollander@app.cibeez.dev.helmes.ee " + cmd
+        ssh_command = f"ssh pessyhollander@app.cibeez.dev.helmes.ee {cmd}"
         # Execute the SSH command
         try:
             result = subprocess.check_output(ssh_command, shell=True)
             print(result.decode())
+            logging.debug(f'exec_subprocess(cmd): {cmd}, result: {result.decode}')
         except subprocess.CalledProcessError as e:
-            print(f"Error executing SSH command: {e}")
+            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command: {e}"
+            print(errmsg)
+            logging.error(msg)
             return False, None
     else: # from local machine
         try:
             result = subprocess.check_output(cmd, shell=True)
             print(result.decode())
+            logging.debug(f'exec_subprocess(cmd): {cmd}, result: {result.decode}')
         except subprocess.CalledProcessError as e:
-            print(f"Error executing shell command: {e}")
+            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command: {e}"
+            print(errmsg)
+            logging.error(msg)
             return False, None
 
     return True, result
@@ -230,6 +236,7 @@ def exec_subprocess(cmd):
 """
 def run_cvrp(downloaded_file):
     cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {download_to_server_dir}{downloaded_file}'
+    logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
     ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
     return ok_exec, ret_exec
 
