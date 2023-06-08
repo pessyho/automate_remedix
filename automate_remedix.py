@@ -456,6 +456,7 @@ if __name__ == "__main__":
     download_to_server_dir = configs.get('dir').get('download_to_server_dir')
     upload_pod_from_server_dir = configs.get('dir').get('upload_pod_from_server_dir')
     artisan_dir = configs.get('dir').get('artisan_dir')
+    cvrp_dir = configs.get('dir').get('cvrp_dir')
 
 
     db_connector, ssh_tunnel_host, server = init_db()
