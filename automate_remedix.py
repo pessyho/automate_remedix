@@ -239,6 +239,7 @@ def run_cvrp(downloaded_file):
     cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
     logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
     ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
+    logging.debug(f'run_cvrp(): {ok_exec}, result:  {ret_exec}')
     return ok_exec, ret_exec
 
 
