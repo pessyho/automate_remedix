@@ -410,7 +410,7 @@ def upload_pod_to_remedix(sftp, this_date):
             #today = dt.datetime.now().strftime("%Y%m%d")
             with os.scandir(upload_pod_from_server_dir) as entries:
                 for entry in entries:
-                    if (f'{today}.pdf') in entry.name:
+                    if (f'{this_date}.pdf') in entry.name:
                         local_path_file = f'{upload_pod_from_server_dir}{entry.name}'
                         remote_file = f'/From Cibeez/{entry.name}'
                         msg = f'Upload pod file: {local_path_file} to remedix: {remote_file}'
