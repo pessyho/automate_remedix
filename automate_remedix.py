@@ -229,7 +229,7 @@ def exec_subprocess(cmd):
 
 """
 def run_cvrp(downloaded_file):
-    cvrp_cmd = '\'cd '+artisan_dir+';  php artisan remedix:tocvrp ' + download_to_server_dir + downloaded_file +"'"
+    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {download_to_server_dir}/{downloaded_file}'
     ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
     return ok_exec, ret_exec
 
@@ -336,15 +336,16 @@ def download_from_remedix(sftp,this_date=None):
 
     if sftp:
 
-        remote_files = sftp.listdir('From remedix')  # list files in dir
-        f_size = 0
-        f_time = 0
 
         if not this_date:
             this_date = dt.datetime.now().strftime("%d%m%y")
         #file_pattern = 'CiBeez_NEXTDAY_240523*.txt' # debug
         file_pattern = f'CiBeez_NEXTDAY_{this_date}*.txt'
+        remote_files = sftp.listdir('From remedix')  # list files in dir
         selected_files = fnmatch.filter(remote_files, file_pattern)
+
+        f_size = 0
+        f_time = 0
 
         if selected_files != []:
             for file in selected_files:
@@ -456,14 +457,16 @@ if __name__ == "__main__":
     if sftp:
         for cmd, val in vars(args).items():
             # NOTE: format for all date is "%d%m%y"
-            this_date = val if isinstance(val, str) else None
-            if cmd == 'download':
-                ok_download, remedix_input_file = download_from_remedix(sftp, this_date)
-            elif cmd == 'pdf':
-                ok_mk_pdf, ret_exec = run_mk_pdf(db_connector, 87 if prod_server_ip else 83, this_date)
-            elif cmd == 'upload':
-                ok_upload = upload_pod_to_remedix(sftp, this_date)
-            elif cmd == 'cvrp':
+            this_input = val if isinstance(val, str) else None
+            if cmd == 'download' and val:
+                ok_download, remedix_input_file = download_from_remedix(sftp, this_input)
+            elif cmd == 'pdf' and val:
+                ok_mk_pdf, ret_exec = run_mk_pdf(db_connector, 87 if prod_server_ip else 83, this_input)
+            elif cmd == 'upload' and val:
+                ok_upload = upload_pod_to_remedix(sftp, this_input)
+            elif cmd == 'cvrp' and val:
+                if isinstance(val, str):
+                    remedix_input_file = val
                 ok_cvrp = run_cvrp(remedix_input_file)
 
         sftp.close()
