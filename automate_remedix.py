@@ -14,6 +14,7 @@
     1.2     added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
     1.3     credentials and dirs in config
     1.3.1   optional date parameter to cmds
+    1.3.1   optional date parameter to cmds
 
 """
 
@@ -274,7 +275,7 @@ def run_mk_pdf(db_connector, o_req_uid, this_date):
         this_date = dt.datetime.now().strftime("%Y-%m-%d")
     else:
         #format from %d%m%y to "%Y-%m-%d"
-        this_date = datetime.datetime.strptime(this_date, '%d%m%y').strftime('%Y-%m-%d')
+        this_date = dt.datetime.strptime(this_date, '%d%m%y').strftime('%Y-%m-%d')
 
     this_sql = 'SELECT id, o_external_id, o_order_state, updated_at FROM orders WHERE o_order_state IN (8,15) \
     AND o_req_uid = {0} AND DATE(updated_at)="{1}";'.format(o_req_uid, this_date)
@@ -389,7 +390,7 @@ def upload_pod_to_remedix(sftp, this_date):
     if not this_date:
         #this_date = dt.datetime.now().strftime("%Y%m%d")
         #format from %d%m%y to "%Y%m%d"
-        this_date = datetime.datetime.strptime(this_date, '%d%m%y').strftime('%Y%m%d')
+        this_date = dt.datetime.strptime(this_date, '%d%m%y').strftime('%Y%m%d')
 
     if sftp:
         try:
