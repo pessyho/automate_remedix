@@ -54,6 +54,7 @@ password = None
 download_to_server_dir = None
 upload_pod_from_server_dir = None
 artisan_dir = None
+cvrp_dir = None
 
 
 def cmdline():
@@ -231,11 +232,11 @@ def exec_subprocess(cmd):
     1. go to directory /var/www/html/order-capture-implementation
     2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
     {foldername} is 
-    download_to_server_dir = '/var/www/html/order-capture-implementation/storage/remedixfiles/'
+    cvrp_dir = '/remedixfiles/'
 
 """
 def run_cvrp(downloaded_file):
-    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {download_to_server_dir}{downloaded_file}'
+    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
     logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
     ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
     return ok_exec, ret_exec
