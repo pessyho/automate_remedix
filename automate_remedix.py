@@ -66,6 +66,7 @@ def cmdline():
     parser.add_argument('--pdf', '-P', nargs='?', const=True, type=str, help='create pdf files')
     parser.add_argument('--upload', '-U', nargs='?', const=True, type=str, help='upload pdf ouput files')
     parser.add_argument('--cvrp', '-C', nargs='?', const=True, type=str, help='run cvrp')
+    parser.add_argument('--deb', '-E', nargs='?', const=True, type=bool, help='deb')
     return parser.parse_args()
 
 
@@ -93,8 +94,8 @@ def load_config(dss=False):
     try:
         if not dss:
             wd = os.getcwd()
-            logging.error(f'wd {wd}')
             config_file = os.path.join(wd, "config/automate_rx.json")
+            logging.error(f'config_file {config_file}')
         else:
             wd = os.environ.get('DSS_WD', '.')
             config_file = os.path.join(wd, "config/dss-config.json")
@@ -480,6 +481,8 @@ if __name__ == "__main__":
                 if isinstance(val, str):
                     remedix_input_file = val
                 ok_cvrp = run_cvrp(remedix_input_file)
+            elif cmd == 'deb' and val:
+                print("end deb")
 
         sftp.close()
 
