@@ -205,7 +205,7 @@ def exec_subprocess(cmd):
             print(result.decode())
             logging.debug(f'exec_subprocess(cmd): {cmd}, result: {result.decode}')
         except subprocess.CalledProcessError as e:
-            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command: {e}"
+            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command. code: {e.returncode}, output: {e.output.decode()}"
             print(errmsg)
             logging.error(msg)
             return False, None
@@ -213,11 +213,11 @@ def exec_subprocess(cmd):
         try:
             result = subprocess.check_output(cmd, shell=True)
             print(result.decode())
-            logging.debug(f'exec_subprocess(cmd): {cmd}, result: {result.decode}')
+            logging.debug(f'exec_subprocess(cmd): {cmd}, result: {result.decode()}')
         except subprocess.CalledProcessError as e:
-            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command: {e}"
+            errmsg = f"exec_subprocess(cmd)(). Error executing SSH command. code: {e.returncode}, output: {e.output.decode()}"
             print(errmsg)
-            logging.error(msg)
+            logging.error(errmsg)
             return False, None
 
     return True, result
