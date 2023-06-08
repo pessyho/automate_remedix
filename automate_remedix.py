@@ -93,6 +93,7 @@ def load_config(dss=False):
     try:
         if not dss:
             wd = os.getcwd()
+            logging.error(f'wd {wd}')
             config_file = os.path.join(wd, "config/automate_rx.json")
         else:
             wd = os.environ.get('DSS_WD', '.')
@@ -398,9 +399,10 @@ def download_from_remedix(sftp,this_date=None):
 def upload_pod_to_remedix(sftp, this_date):
     count = 0
     if not this_date:
-        #this_date = dt.datetime.now().strftime("%Y%m%d")
+        this_date = dt.datetime.now().strftime("%Y%m%d") # use default "today"
         #format from %d%m%y to "%Y%m%d"
-        this_date = dt.datetime.now().strftime("%Y%m%d")
+    else:
+        this_date = dt.datetime.strptime(this_date, '%d%m%y').strftime('%Y%m%d')
 
     if sftp:
         try:
