@@ -93,9 +93,10 @@ def load_config(dss=False):
     config_file = None
     try:
         if not dss:
-            wd = os.getcwd()
-            config_file = os.path.join(wd, "config/automate_rx.json")
-            logging.error(f'config_file {config_file}')
+            #wd = os.getcwd()
+            #config_file = os.path.join(wd, "config/automate_rx.json")
+            config_file = "./config/automate_rx.json" # use relative directory because of crontab
+            logging.debug(f'config_file {config_file}')
         else:
             wd = os.environ.get('DSS_WD', '.')
             config_file = os.path.join(wd, "config/dss-config.json")
