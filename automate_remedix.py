@@ -100,9 +100,10 @@ def load_config(dss=False):
         else:
             wd = os.environ.get('DSS_WD', '.')
             config_file = os.path.join(wd, "config/dss-config.json")
-        #if not os.path.isfile(config_file):
-        #    logging.error('ERR missing automate_rx.json configuraion file ')
-        #    return False, None
+            logging.debug(f'dss config_file {config_file}')
+        if not os.path.isfile(config_file):
+            logging.error('ERR missing automate_rx.json configuraion file ')
+            return False, None
 
         with open(config_file) as json_data_file:
             data = json.load(json_data_file)
