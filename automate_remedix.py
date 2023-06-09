@@ -93,16 +93,16 @@ def load_config(dss=False):
     config_file = None
     try:
         if not dss:
-            #wd = os.getcwd()
-            #config_file = os.path.join(wd, "config/automate_rx.json")
-            config_file = "./config/automate_rx.json" # use relative directory because of crontab
+            wd = os.getcwd()
+            config_file = os.path.join(wd, "config/automate_rx.json")
+            #config_file = "./config/automate_rx.json" # use relative directory because of crontab
             logging.debug(f'config_file {config_file}')
         else:
             wd = os.environ.get('DSS_WD', '.')
             config_file = os.path.join(wd, "config/dss-config.json")
-        if not os.path.isfile(config_file):
-            logging.error('ERR missing automate_rx.json configuraion file ')
-            return False, None
+        #if not os.path.isfile(config_file):
+        #    logging.error('ERR missing automate_rx.json configuraion file ')
+        #    return False, None
 
         with open(config_file) as json_data_file:
             data = json.load(json_data_file)
