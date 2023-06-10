@@ -100,7 +100,7 @@ def load_config(dss=False):
             logging.debug(f'config_file {config_file}')
         else:
             wd = os.environ.get('DSS_WD', '.')
-            logging.debug(f"DSS_WD: {wd}.")
+            logging.debug(f"DSS_WD: {wd}")
             config_file = os.path.join(wd, "config/dss-config.json")
             logging.debug(f'dss config_file {config_file}')
         if not os.path.isfile(config_file):
