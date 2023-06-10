@@ -93,9 +93,9 @@ def load_config(dss=False):
     config_file = None
     try:
         if not dss:
-            wd = os.getcwd()
-            config_file = os.path.join(wd, "config/automate_rx.json")
-            #config_file = "./config/automate_rx.json" # use relative directory because of crontab
+            #wd = os.getcwd()
+            #config_file = os.path.join(wd, "config/automate_rx.json")
+            config_file = "./config/automate_rx.json"  # use relative directory because of crontab
             logging.debug(f'config_file {config_file}')
         else:
             wd = os.environ.get('DSS_WD', '.')
@@ -484,7 +484,10 @@ if __name__ == "__main__":
                     remedix_input_file = val
                 ok_cvrp = run_cvrp(remedix_input_file)
             elif cmd == 'deb' and val:
-                print("end deb")
+                wd = os.getcwd()
+                msg = f"wd: {wd}. \nend deb"
+                logging.deb(msg)
+                print(msg)
 
         sftp.close()
 
