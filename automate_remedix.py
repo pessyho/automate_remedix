@@ -484,7 +484,7 @@ if __name__ == "__main__":
             elif cmd == 'cvrp' and val:
                 if isinstance(val, str):
                     remedix_input_file = val
-                ok_cvrp = run_cvrp(remedix_input_file)
+                ok_cvrp, ret_exec = run_cvrp(remedix_input_file)
             elif cmd == 'deb' and val:
                 msg = f"deb mode: {val}"
                 logging.deb(msg)
