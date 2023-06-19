@@ -222,7 +222,7 @@ def exec_subprocess(cmd):
             print(result.decode())
             logging.debug(f'exec_subprocess(cmd): {cmd} success, result: {result.decode("utf-8")}')
         except subprocess.CalledProcessError as e:
-            errmsg = f'exec_subprocess(cmd)(). Error executing SSH command. code: {e.returncode}, output: {e.output.decode("utf-8")}'
+            errmsg = f'exec_subprocess(cmd)(). Error executing cmd {cmd}. code: {e.returncode}, output: {e.output.decode("utf-8")}'
             print(errmsg)
             logging.error(errmsg)
             return False, None
