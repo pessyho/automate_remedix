@@ -270,7 +270,7 @@ not validated orders:\n\t{ret_exec_dict.get("not validated orders")}\n\n \
             logging.debug(f'{report} is being sent by email...')
         else:
             cvrp_cmd = cvrp_cmd.replace('"','') # remove #
-            report = f'run_cvrp() cmd: {cvrp_cmd} failed. '
+            report = f'run_cvrp() cmd failed.\n{cvrp_cmd}\n'
             logging.debug(report)
     email_cmd = f'\'{home_dir}/email_cvrp_report.sh "{report}"\''
     ok_exec, ret_exec = exec_subprocess(email_cmd)
