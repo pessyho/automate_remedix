@@ -15,9 +15,11 @@
     1.3     credentials and dirs in config
     1.3.1   optional date parameter to cmds
     1.3.1   optional date parameter to cmds
+    1.3.2   added run_cvrp report by email
 
 """
 
+_VERSION = '1.3.2'
 
 import paramiko
 import logging
@@ -37,8 +39,6 @@ import pandas as pd
 import argparse
 
 
-_VERSION = '1.3.1'
-
 # db connectors
 db_connector = None
 ssh_tunnel_host = None
@@ -55,6 +55,7 @@ download_to_server_dir = None
 upload_pod_from_server_dir = None
 artisan_dir = None
 cvrp_dir = None
+home_dir = None
 
 
 def cmdline():
@@ -204,7 +205,7 @@ def exec_subprocess(cmd):
 
     if _platform == 'darwin': # running from MAC
         # SSH command to execute
-        ssh_command = f"ssh pessyhollander@app.cibeez.dev.helmes.ee {cmd}"
+        ssh_command = f'ssh pessyhollander@app.cibeez.dev.helmes.ee {cmd}'
         # Execute the SSH command
         try:
             result = subprocess.check_output(ssh_command, shell=True)
@@ -213,7 +214,7 @@ def exec_subprocess(cmd):
         except subprocess.CalledProcessError as e:
             errmsg = f'exec_subprocess(cmd)(). Error executing SSH command. code: {e.returncode}, output: {e.output.decode("utf-8")}'
             print(errmsg)
-            logging.error(msg)
+            logging.error(errmsg)
             return False, None
     else: # from local machine
         try:
@@ -241,45 +242,49 @@ def exec_subprocess(cmd):
     cvrp_dir = '/remedixfiles/'
 
 """
+
+
 def run_cvrp(downloaded_file):
-    cvrp_cmd = f'cd {artisan_dir};  php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
-    logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
-    ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
-    logging.debug(f'run_cvrp(): {ok_exec}, result:  {ret_exec}')
+
+    ok_exec = False
+    ret_exec = None
+
+    if downloaded_file is None:
+        report = f'"run_cvrp() ERR, missing input file.."'
+        logging.debug(report)
+    else:
+        cvrp_cmd = f'"cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}"'
+        logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
+        ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
+        logging.debug(f'run_cvrp(): {ok_exec}, raw result:  {ret_exec}')
+        if ok_exec and ok_exec is not None:
+            ret_exec_dict = json.loads(ret_exec.decode('utf-8'))
+            counts = ''
+            for key, val in ret_exec_dict.get("counts").items():
+                counts = f'{counts}\n{key}: {val}'
+            report = f'*** run_cvrp() report *** \n\n \
+count summary:\n\t{counts}\n\n \
+not ready for validation:\n\t{ret_exec_dict.get("not ready for validation")}\n\n \
+not validated orders:\n\t{ret_exec_dict.get("not validated orders")}\n\n \
+\n*** end run_cvrp() report ***\n'
+            logging.debug(f'{report} is being sent by email...')
+        else:
+            report = f'run_cvrp() cmd: {cvrp_cmd} failed. ok_exec: {ok_exec}, ret_exec: {ret_exec}'
+            logging.debug(report)
+    email_cmd = f'\'{home_dir}/email_cvrp_report.sh "{report}"\''
+    ok_exec, ret_exec = exec_subprocess(email_cmd)
     return ok_exec, ret_exec
 
 
 """
 
-PDF artisan
+    run_mk_pdf(db_connector, o_req_uid, this_date)
+    
+    PDF artisan
 
     1. cd /var/www/html/order-capture-implementation
     2. pod:save "10141784,10151082,5555555555,10186911,10189742,10184283,8924338"
-
-    {
-          "status": "OK",
-          "stored": 4,
-          "dir": "/var/www/html/order-capture-implementation/storage/pods/Remedix",
-          "pods": [
-            [
-              "991831920",
-              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8M23018650_20230531.pdf"
-            ],
-            [
-              " 991831921",
-              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8M23018652_20230531.pdf"
-            ],
-            [
-              " 991840694",
-              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8U21035594_20230531.pdf"
-            ],
-            [
-              " 991840695",
-              "/var/www/html/order-capture-implementation/storage/pods/Remedix/8U21035723_20230531.pdf"
-            ]
-          ]
-    }
-
+    
 """
 def run_mk_pdf(db_connector, o_req_uid, this_date):
     ret_exec = None
@@ -465,7 +470,7 @@ if __name__ == "__main__":
     upload_pod_from_server_dir = configs.get('dir').get('upload_pod_from_server_dir')
     artisan_dir = configs.get('dir').get('artisan_dir')
     cvrp_dir = configs.get('dir').get('cvrp_dir')
-
+    home_dir = configs.get('dir').get('home_dir')
 
     db_connector, ssh_tunnel_host, server = init_db()
     #today = dt.datetime.now().strftime("%d%m%y")
