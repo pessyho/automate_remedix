@@ -253,7 +253,10 @@ def run_cvrp(downloaded_file):
         report = f'"run_cvrp() ERR, missing input file.."'
         logging.debug(report)
     else:
-        cvrp_cmd = f'"cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}"'
+        if _platform == 'darwin': # its packed in an SSH so we need to pack the cmd in ""
+            cvrp_cmd = f'"cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}"'
+        else:
+            cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
         logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
         ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
         logging.debug(f'run_cvrp(): {ok_exec}, raw result:  {ret_exec}')
