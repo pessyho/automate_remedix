@@ -250,13 +250,12 @@ def run_cvrp(downloaded_file):
     ret_exec = None
 
     if downloaded_file is None:
-        report = f'"run_cvrp() ERR, missing input file.."'
+        report = f'run_cvrp() ERR, missing input file..'
         logging.debug(report)
     else:
-        if _platform == 'darwin': # its packed in an SSH so we need to pack the cmd in ""
-            cvrp_cmd = f'"cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}"'
-        else:
-            cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
+        cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
+        if _platform == 'darwin': # in darwin/MAC its packed in an SSH so we need to pack the cmd in ""
+            cvrp_cmd = f'"{cvrp_cmd}"'
         logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
         ok_exec, ret_exec = exec_subprocess(cvrp_cmd)
         logging.debug(f'run_cvrp(): {ok_exec}, raw result:  {ret_exec}')
@@ -272,7 +271,7 @@ not validated orders:\n\t{ret_exec_dict.get("not validated orders")}\n\n \
 \n*** end run_cvrp() report ***\n'
             logging.debug(f'{report} is being sent by email...')
         else:
-            cvrp_cmd = cvrp_cmd.replace('"','') # remove #
+            cvrp_cmd = cvrp_cmd.replace('"', '') # remove #
             report = f'run_cvrp() cmd failed.\n{cvrp_cmd}\n'
             logging.debug(report)
     email_cmd = f'\'{home_dir}/email_cvrp_report.sh "{report}"\''
