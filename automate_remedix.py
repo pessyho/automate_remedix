@@ -274,7 +274,11 @@ not validated orders:\n\t{ret_exec_dict.get("not validated orders")}\n\n \
             cvrp_cmd = cvrp_cmd.replace('"', '') # remove #
             report = f'run_cvrp() cmd failed.\n{cvrp_cmd}\n'
             logging.debug(report)
-    email_cmd = f'\'{home_dir}/email_cvrp_report.sh "{report}"\''
+
+    if _platform == 'darwin':
+        email_cmd = f'\'{home_dir}/email_cvrp_report.sh "{report}"\''
+    else:
+        email_cmd = f'{home_dir}/email_cvrp_report.sh "{report}"'
     ok_exec, ret_exec = exec_subprocess(email_cmd)
     return ok_exec, ret_exec
 
