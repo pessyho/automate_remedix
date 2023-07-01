@@ -267,7 +267,7 @@ def run_cvrp(downloaded_file):
             report = f'*** run_cvrp() report *** \n\n \
 count summary:\n\t{counts}\n\n \
 not ready for validation:\n\t{ret_exec_dict.get("not ready for validation")}\n\n \
-not validated orders:\n\t{ret_exec_dict.get("not validated orders")}\n\n \
+not validated orders (כתובות):\n\t{ret_exec_dict.get("not validated orders")}\n\n \
 \n*** end run_cvrp() report ***\n'
             logging.debug(f'{report} is being sent by email...')
         else:

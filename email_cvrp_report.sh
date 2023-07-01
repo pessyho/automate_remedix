@@ -12,7 +12,7 @@ fi
 
 report=$1
 from='CiBeez post <post@cibeez.com>'
-to='pessy.hollander@gmail.com'
+to='pessy.hollander@gmail.com,Hanan.Benassayag@remedix-care.co.il'
 cc='pessy@cibeez.com'
 subject="Remedix CVRP report $TS"
 
