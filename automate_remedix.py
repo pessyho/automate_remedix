@@ -14,7 +14,6 @@
     1.2     added cmdline parsing,  cvrp  and parsing of json response on artisan pod:save
     1.3     credentials and dirs in config
     1.3.1   optional date parameter to cmds
-    1.3.1   optional date parameter to cmds
     1.3.2   added run_cvrp report by email
 
 """
