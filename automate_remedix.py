@@ -249,7 +249,7 @@ def run_cvrp(downloaded_file):
     ret_exec = None
 
     if downloaded_file is None:
-        report = f'run_cvrp() ERR, missing input file..'
+        report = f'run_cvrp() ERR, missing input file: {downloaded_file}. terminating..'
         logging.debug(report)
     else:
         cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
