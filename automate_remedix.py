@@ -15,7 +15,7 @@
     1.3     credentials and dirs in config
     1.3.1   optional date parameter to cmds
     1.3.2   added run_cvrp report by email
-    1.3.3   added download file validation by size comparison
+    1.3.3   added download file validation by size comparison + retry if issue with the size mismatch
 
 """
 
@@ -360,8 +360,9 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
 """
 def download_from_remedix(sftp,this_date=None):
 
+    retry = 2
 
-    if sftp:
+    while sftp and retry:
 
 
         if not this_date:
@@ -410,16 +411,16 @@ def download_from_remedix(sftp,this_date=None):
             # check that dopwnlaoded file size and org are the same ..
             downloaded_fsize = os.path.getsize(f"{local_dir}/{download_this}")
             if downloaded_fsize != f_size:
-                msg = f"downloaded file size {downloaded_fsize} <> file size on shared drive: {f_size}. Terminating"
+                msg = f"ERR Download validation: local file size {downloaded_fsize} DONT MATCH file size on shared drive: {f_size}. Retry: {retry}"
                 print(msg)
                 logging.debug(msg)
-                return False, None
+                #return False, None
+                retry = retry - 1
             else:
-                msg = f"downloaded file size {downloaded_fsize} match file size on shared drive: {f_size}."
+                msg = f"SUCCESS Download validation: local file size: {downloaded_fsize} match file size on shared drive: {f_size}."
                 print(msg)
                 logging.debug(msg)
-
-            return True, download_this
+                return True, download_this
         else:
             msg = "Nothing to download..."
             print(msg)
