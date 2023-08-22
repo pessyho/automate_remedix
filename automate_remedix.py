@@ -15,10 +15,11 @@
     1.3     credentials and dirs in config
     1.3.1   optional date parameter to cmds
     1.3.2   added run_cvrp report by email
+    1.3.3   added download file validation by size comparison
 
 """
 
-_VERSION = '1.3.2'
+_VERSION = '1.3.3'
 
 import paramiko
 import logging
@@ -381,7 +382,10 @@ def download_from_remedix(sftp,this_date=None):
                 #    print('file: {0}'.format(file))
                 if sftp.stat(file).st_size > f_size and sftp.stat(file).st_mtime > f_time:
                     download_this = file
-            msg = "found nd file to download : {}".format(download_this)
+                    f_size = sftp.stat(file).st_size # store file size
+                    f_time = sftp.stat(file).st_mtime # store file timestamp
+                    timestamp = dt.datetime.strftime(dt.datetime.fromtimestamp(sftp.stat(file).st_mtime),"%Y-%m-%d %H:%S:%M")
+            msg = f"found ND file to download: {download_this}, size: {f_size}, timestamp: {timestamp}"
             print(msg)
             logging.debug(msg)
             # download file
@@ -402,6 +406,18 @@ def download_from_remedix(sftp,this_date=None):
                     print(msg)
                     logging.debug(msg)
                     return False, None
+
+            # check that dopwnlaoded file size and org are the same ..
+            downloaded_fsize = os.path.getsize(f"{local_dir}/{download_this}")
+            if downloaded_fsize != f_size:
+                msg = f"downloaded file size {downloaded_fsize} <> file size on shared drive: {f_size}. Terminating"
+                print(msg)
+                logging.debug(msg)
+                return False, None
+            else:
+                msg = f"downloaded file size {downloaded_fsize} match file size on shared drive: {f_size}."
+                print(msg)
+                logging.debug(msg)
 
             return True, download_this
         else:
