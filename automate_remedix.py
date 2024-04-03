@@ -16,10 +16,12 @@
     1.3.1   optional date parameter to cmds
     1.3.2   added run_cvrp report by email
     1.3.3   added download file validation by size comparison + retry if issue with the size mismatch
+    1.3.4   add sms notification in case there is an issue with the sftp
+    1.4     added new artisan tocvrp options/flags to have stepwise validation process
 
 """
 
-_VERSION = '1.3.3'
+_VERSION = '1.4'
 
 import paramiko
 import logging
@@ -37,6 +39,8 @@ import subprocess
 import socket
 import pandas as pd
 import argparse
+import requests
+import traceback
 
 
 # db connectors
@@ -56,7 +60,7 @@ upload_pod_from_server_dir = None
 artisan_dir = None
 cvrp_dir = None
 home_dir = None
-
+tocvrp_options = ['V', 'S', 'C', 'VS', 'SC', 'VSC']
 
 def cmdline():
     parser = argparse.ArgumentParser()
@@ -66,7 +70,7 @@ def cmdline():
     parser.add_argument('--download', '-D', nargs='?', const=True, type=str, help='download remedix input file')
     parser.add_argument('--pdf', '-P', nargs='?', const=True, type=str, help='create pdf files')
     parser.add_argument('--upload', '-U', nargs='?', const=True, type=str, help='upload pdf ouput files')
-    parser.add_argument('--cvrp', '-C', nargs='?', const=True, type=str, help='run cvrp')
+    parser.add_argument('--cvrp', '-C', nargs='*', action='append', type=str, help='run cvrp') # 0 or more args
     parser.add_argument('--deb', '-E', nargs='?', const=True, type=bool, help='deb')
     return parser.parse_args()
 
@@ -244,7 +248,7 @@ def exec_subprocess(cmd):
 """
 
 
-def run_cvrp(downloaded_file):
+def run_cvrp(downloaded_file, option=''):
 
     ok_exec = False
     ret_exec = None
@@ -253,7 +257,7 @@ def run_cvrp(downloaded_file):
         report = f'run_cvrp() ERR, missing input file: {downloaded_file}. terminating..'
         logging.debug(report)
     else:
-        cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file}'
+        cvrp_cmd = f'cd {artisan_dir}; php artisan remedix:tocvrp {cvrp_dir}{downloaded_file} {option}'
         if _platform == 'darwin': # in darwin/MAC its packed in an SSH so we need to pack the cmd in ""
             cvrp_cmd = f'"{cvrp_cmd}"'
         logging.debug(f'run_cvrp() cmd: {cvrp_cmd}')
@@ -342,14 +346,16 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
         elif auth_type == "user_pass":
             transport.connect(username = username, password = password)
         else:
-            msg = "connect_to_sftp err, uknown auth_type {}".format(auth_type)
+            msg = "connect_to_sftp err, unknown auth_type {}".format(auth_type)
             logging.log(logging.WARNING, msg)
             print(msg)
+            send_sms_alert(msg)
         sftp = paramiko.SFTPClient.from_transport(transport)
     except Exception as e:
         msg = f'sfpt exception: {e}'
         logging.error(msg)
         print(msg)
+        send_sms_alert(msg)
         return None, None
 
     return sftp, transport
@@ -457,10 +463,101 @@ def upload_pod_to_remedix(sftp, this_date):
             msg = f'sftp.put() Exception: {e}'
             print(msg)
             logging.debug(msg)
+            send_sms_alert(msg)
             return False
     msg = f'Uploaded total of {count} pod files to remedix for today: {this_date}'
     print(msg)
     logging.debug(msg)
+    return True
+
+
+sms019_config = {
+"usr_201": {"usr": "cibeez", "pwd": "Jf6pob1A", "token": "eyJ0eXAiOiJqd3QiLCJhbGciOiJIUzI1NiJ9.eyJmaXJzdF9rZXkiOiIxODQ4NyIsInNlY29uZF9rZXkiOiIxNTQzMTQ5IiwiaXNzdWVkQXQiOiIwOS0wMS0yMDI0IDIyOjMyOjMxIiwidHRsIjo2MzA3MjAwMH0.lSe8jDYgwwgPuJ2s1-_ikMRCeHTkxdneZ2Q5OyLVFqo"},
+"usr_268": {"usr": "cibeez2", "pwd": "Tx26u6Vy", "token" :"eyJ0eXAiOiJqd3QiLCJhbGciOiJIUzI1NiJ9.eyJmaXJzdF9rZXkiOiIxODQ4OSIsInNlY29uZF9rZXkiOiIxNTQzMTU2IiwiaXNzdWVkQXQiOiIwOS0wMS0yMDI0IDIyOjM0OjA2IiwidHRsIjo2MzA3MjAwMH0.HDM35rqhCal1IW4_vhIKWgdgrUMuIOWThf4J7IWOIME"},
+"usr_335": {"usr": "cibeez3", "pwd": "Qo2pH5Uv", "token": "eyJ0eXAiOiJqd3QiLCJhbGciOiJIUzI1NiJ9.eyJmaXJzdF9rZXkiOiIxODQ5MSIsInNlY29uZF9rZXkiOiIxNTQzMTYyIiwiaXNzdWVkQXQiOiIwOS0wMS0yMDI0IDIyOjM0OjUzIiwidHRsIjo2MzA3MjAwMH0.09MEEHLER5rn1RjQcJL03lfFlU7UytgA6kEXhpbeKJU"},
+}
+
+pessy_phone = '053-285-2755'
+hannan_phone = '054-888-4315'
+alert_phone_numbers = [pessy_phone, hannan_phone]
+def send_sms_alert(sms_text,source="SuperPharm"):
+
+    usr_201 = sms019_config.get('usr_201').get('usr')
+    usr_268 = sms019_config.get('usr_268').get('usr')
+    usr_335 = sms019_config.get('usr_335').get('usr')
+    pwd_201 = sms019_config.get('usr_201').get('pwd')
+    pwd_268 = sms019_config.get('usr_268').get('pwd')
+    pwd_335 = sms019_config.get('usr_335').get('pwd')
+    token_201 = sms019_config.get('usr_201').get('token')
+    token_268 = sms019_config.get('usr_268').get('token')
+    token_335 = sms019_config.get('usr_335').get('token')
+
+
+    if len(sms_text) <= 201:
+        usr = usr_201
+        pwd = pwd_201
+        token = token_201
+    elif len(sms_text) <= 268:
+        usr = usr_268
+        pwd = pwd_268
+        token = token_268
+    else:
+        usr = usr_335
+        pwd = pwd_335
+        token = token_335
+
+    for xphone in alert_phone_numbers:
+
+        cln_phone_number = xphone.replace('-','') # remove hyphen from tel number
+        # sms019_test_url = 'https://www.019sms.co.il:8090/api/test'
+        sms019_url = 'https://www.019sms.co.il/api'
+        #sms019_url = 'www.019sms.co.il/api'
+        # "<user>\n" <username>" + usr + "</username>\n" "<password>" + pwd + "</password>\n" "</user>\n"
+        sms019_fmt = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+                     "<sms>\n" \
+                     "<user>\n <username>" + usr + "</username>\n</user>\n" \
+                     "<source>" + source + "</source>\n" \
+                                           "<destinations>\n"\
+                                           "<phone id=\"{0}\">{1}</phone>\n" \
+                                           "</destinations>\n" \
+                                           "<message>{2}</message>\n" \
+                                           "</sms>".format(xphone, cln_phone_number, sms_text)
+
+        headers = {'content-type': 'application/xml', 'Authorization': 'Bearer {0}'.format(token), 'Accept-Charset': 'UTF-8'}
+        logging.debug(f'sending sms019_fmt: {sms019_fmt}')
+
+        retry = 1 # no retries meanwhile .... makes problems and delays ...
+        while retry > 0:
+            try:
+                r = requests.post(url=sms019_url,data=sms019_fmt.encode('utf-8'), headers=headers,timeout=3)
+                content = r.text
+                if r.status_code != 200:
+                    return False, 'send_sms err, Content is Unavailable'
+                else:
+                    result = xmltodict.parse(content)
+                    status = int(result['sms']['status'])
+                    if status != 0:
+                        errmsg = 'ERR: from provider, status: {0} msg: {1} '.format(
+                            result['sms']['status'], result['sms']['message'])
+                        logging.debug(errmsg)
+                        return False, f'send_sms err {errmsg}'
+                    else:
+                        okmsg = f'sent sms to {phone_number} ok. response is: {content}'
+                        logging.debug(okmsg)
+                        retry = 0
+                        break
+            #except urllib2.HTTPError as e:
+            except requests.exceptions.RequestException as e:
+                retry -= 1
+                if not retry:
+                    return False, f'send_sms err, RequestException: {str(e.code)}'
+                time.sleep(0.5)
+            except Exception as e:
+                retry -= 1
+                if not retry:
+                    return False, f'send_sms err, generic exception: {e}, traceback {traceback.format_exc()}'
+                time.sleep(0.5)
+
     return True
 
 if __name__ == "__main__":
@@ -497,12 +594,16 @@ if __name__ == "__main__":
 
     db_connector, ssh_tunnel_host, server = init_db()
     #today = dt.datetime.now().strftime("%d%m%y")
-    remedix_input_file = None
+    remedix_input_file = ''
     sftp, transport = connect_to_sftp(host, port, user, password, None, 'user_pass')
     if sftp:
         for cmd, val in vars(args).items():
             # NOTE: format for all date is "%d%m%y"
+            this_option = ''
             this_input = val if isinstance(val, str) else None
+            #if this_input and this_input.upper() in tocvrp_options:
+            #    this_option = this_input.upper()
+            #    this_input = None
             if cmd == 'download' and val:
                 ok_download, remedix_input_file = download_from_remedix(sftp, this_input)
             elif cmd == 'pdf' and val:
@@ -510,9 +611,20 @@ if __name__ == "__main__":
             elif cmd == 'upload' and val:
                 ok_upload = upload_pod_to_remedix(sftp, this_input)
             elif cmd == 'cvrp' and val:
-                if isinstance(val, str):
-                    remedix_input_file = val
-                ok_cvrp, ret_exec = run_cvrp(remedix_input_file)
+                if len(val[0]) == 2: # file name and tocvrp arg for artisan defined in cvrp_options
+                    remedix_input_file = val[0][0]
+                    if val[0][1] in tocvrp_options:
+                        this_option = str(val[0][1])
+                    else:
+                        msg = f'Unknow argument list: {val[0]}'
+                        logging.deb(msg)
+                        print(msg)
+                        break
+                elif val[0][0] in tocvrp_options: # check if cvrp artisan option
+                    this_option = str(val[0][0])
+                else:  # remedix file name
+                    remedix_input_file = str(val[0][0])
+                ok_cvrp, ret_exec = run_cvrp(remedix_input_file, this_option)
             elif cmd == 'deb' and val:
                 msg = f"deb mode: {val}"
                 logging.deb(msg)
