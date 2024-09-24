@@ -480,7 +480,7 @@ sms019_config = {
 pessy_phone = '053-285-2755'
 hannan_phone = '054-888-4315'
 alert_phone_numbers = [pessy_phone, hannan_phone]
-def send_sms_alert(sms_text,source="SuperPharm"):
+def send_sms_alert(sms_text,source="Remedix"):
 
     usr_201 = sms019_config.get('usr_201').get('usr')
     usr_268 = sms019_config.get('usr_268').get('usr')
