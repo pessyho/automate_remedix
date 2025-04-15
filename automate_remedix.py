@@ -18,10 +18,11 @@
     1.3.3   added download file validation by size comparison + retry if issue with the size mismatch
     1.3.4   add sms notification in case there is an issue with the sftp
     1.4     added new artisan tocvrp options/flags to have stepwise validation process
+    1.4.1   sys.exit(0)
 
 """
 
-_VERSION = '1.4'
+_VERSION = '1.4.1'
 
 import paramiko
 import logging
@@ -627,13 +628,15 @@ if __name__ == "__main__":
                 ok_cvrp, ret_exec = run_cvrp(remedix_input_file, this_option)
             elif cmd == 'deb' and val:
                 msg = f"deb mode: {val}"
-                logging.deb(msg)
+                logging.debug(msg)
                 print(msg)
 
         sftp.close()
 
     logging.debug("Done.")
     print("Done.")
+    sys.exit(0)
+
 
 
 
