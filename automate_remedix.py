@@ -332,6 +332,7 @@ def run_mk_pdf(db_connector, o_req_uid, this_date):
 def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
     try:
         if not _python39:
+            # Use paramiko.Transport for Python 3.7.5
             transport = paramiko.Transport((host, port))
             if auth_type == "key_and_pass":
                 sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
@@ -353,7 +354,8 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
             sftp = paramiko.SFTPClient.from_transport(transport)
             return sftp, transport
 
-        else: # _python39 is True, use paramiko 2.7.2
+        else: # _python39 is True
+            os.environ['CRYPTOGRAPHY_ALLOW_UNSAFE_ALGORITHMS'] = '1'
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             if auth_type == "key_and_pass":
@@ -400,7 +402,7 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
         msg = f'sfpt exception: {e}'
         logging.error(msg)
         print(msg)
-        send_sms_alert(msg)
+        #send_sms_alert(msg)
         return None, None
 
 
