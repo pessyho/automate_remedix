@@ -19,7 +19,7 @@
     1.3.4   add sms notification in case there is an issue with the sftp
     1.4     added new artisan tocvrp options/flags to have stepwise validation process
     1.4.1   sys.exit(0)
-    1.4.2   Disable key-based auth by not passing pkey
+    1.4.2   connectto_tsp() -> Use paramiko.SSHClient() for _python39 not paramiko.Transport()  (Disable key-based auth by not passing pkey)
 
 """
 
@@ -123,8 +123,6 @@ def load_config(dss=False):
     return True, data
 
 def init_db():
-
-    global _python39
 
     # db config , init db connector and sshtunnel
     wd = os.environ.get('DSS_WD', '.')
@@ -329,30 +327,75 @@ def run_mk_pdf(db_connector, o_req_uid, this_date):
 
     return ok_exec, ret_exec
 
-
 #Auth types: user_pass, key_only, key_and_pass
 #You can pass a junk string in for password or sftp_key if not used
 def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
     try:
-        transport = paramiko.Transport((host, port))
-        if auth_type == "key_and_pass":
-            sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
-            transport.start_client(event=None, timeout=15)
-            transport.get_remote_server_key()
-            transport.auth_publickey(username, sftp_key, event=None)
-            transport.auth_password(username, password, event=None)
-            #transport.connect(username = username, password = password, pkey = sftp_key)
-        elif auth_type == "key_only":
-            sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
-            transport.connect(username = username, pkey = sftp_key)
-        elif auth_type == "user_pass":
-            transport.connect(None, username = username, password = password) # Disable key-based auth by not passing pkey
-        else:
-            msg = "connect_to_sftp err, unknown auth_type {}".format(auth_type)
-            logging.log(logging.WARNING, msg)
-            print(msg)
-            send_sms_alert(msg)
-        sftp = paramiko.SFTPClient.from_transport(transport)
+        if not _python39:
+            transport = paramiko.Transport((host, port))
+            if auth_type == "key_and_pass":
+                sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
+                transport.start_client(event=None, timeout=15)
+                transport.get_remote_server_key()
+                transport.auth_publickey(username, sftp_key, event=None)
+                transport.auth_password(username, password, event=None)
+                #transport.connect(username = username, password = password, pkey = sftp_key)
+            elif auth_type == "key_only":
+                sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
+                transport.connect(username = username, pkey = sftp_key)
+            elif auth_type == "user_pass":
+                transport.connect(None, username = username, password = password) # Disable key-based auth by not passing pkey
+            else:
+                msg = "connect_to_sftp err, unknown auth_type {}".format(auth_type)
+                logging.log(logging.WARNING, msg)
+                print(msg)
+                send_sms_alert(msg)
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            return sftp, transport
+
+        else: # _python39 is True, use paramiko 2.7.2
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            if auth_type == "key_and_pass":
+                key = paramiko.RSAKey.from_private_key_file(sftp_key)
+                ssh.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    pkey=key,
+                    look_for_keys=False,
+                    allow_agent=False
+                )
+            elif auth_type == "key_only":
+                key = paramiko.RSAKey.from_private_key_file(sftp_key)
+                ssh.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    pkey=key,
+                    look_for_keys=False,
+                    allow_agent=False
+                )
+            elif auth_type == "user_pass":
+                ssh.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    look_for_keys=False,
+                    allow_agent=False
+                )
+            else:
+                msg = f"connect_to_sftp error: unknown auth_type {auth_type}"
+                logging.warning(msg)
+                print(msg)
+                send_sms_alert(msg)
+                return None, None
+
+            sftp = ssh.open_sftp()
+            return sftp, ssh
+
     except Exception as e:
         msg = f'sfpt exception: {e}'
         logging.error(msg)
@@ -360,7 +403,7 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
         send_sms_alert(msg)
         return None, None
 
-    return sftp, transport
+
 
 
 """
