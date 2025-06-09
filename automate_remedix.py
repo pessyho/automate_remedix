@@ -25,10 +25,12 @@
 
 _VERSION = '1.4.2'
 
+import os
+os.environ['CRYPTOGRAPHY_ALLOW_UNSAFE_ALGORITHMS'] = '1'
 import paramiko
+
 import logging
 import datetime as dt
-import os
 import sys
 from sys import platform as _platform
 import mysql.connector
@@ -355,7 +357,6 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
             return sftp, transport
 
         else: # _python39 is True
-            os.environ['CRYPTOGRAPHY_ALLOW_UNSAFE_ALGORITHMS'] = '1'
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             if auth_type == "key_and_pass":
