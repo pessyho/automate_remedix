@@ -20,15 +20,14 @@
     1.4     added new artisan tocvrp options/flags to have stepwise validation process
     1.4.1   sys.exit(0)
     1.4.2   connectto_tsp() -> Use paramiko.SSHClient() for _python39 not paramiko.Transport()  (Disable key-based auth by not passing pkey)
+    1.4.2.1 fixes
 
 """
 
-_VERSION = '1.4.2'
+_VERSION = '1.4.2.1'
 
 import os
-os.environ['CRYPTOGRAPHY_ALLOW_UNSAFE_ALGORITHMS'] = '1'
 import paramiko
-
 import logging
 import datetime as dt
 import sys
@@ -246,6 +245,15 @@ def exec_subprocess(cmd):
     2. run this cmd  php artisan remedix:tocvrp /{foldername}/{filename} 
     {foldername} is 
     cvrp_dir = '/remedixfiles/'
+    
+    artisan options
+    php artisan remedix:tocvrp <path>  = do everything
+    php artisan remedix:tocvrp <path> V = only do Validate
+    php artisan remedix:tocvrp <path> S = only do Submit
+    php artisan remedix:tocvrp <path> C = only do CVRP
+    php artisan remedix:tocvrp <path> VS = do Validate & Submit
+    php artisan remedix:tocvrp <path> SC = do Submit & CVRP
+    php artisan remedix:tocvrp <path> VSC = do everything
 
 """
 
@@ -267,8 +275,10 @@ def run_cvrp(downloaded_file, option=''):
         logging.debug(f'run_cvrp(): {ok_exec}, raw result:  {ret_exec}')
         if ok_exec and ok_exec is not None:
             ret_exec_dict = json.loads(ret_exec.decode('utf-8'))
+            #print(f"ret_exec_dict: {ret_exec_dict}")
+            logging.debug(f"ret_exec_dict: {ret_exec_dict}")
             counts = ''
-            for key, val in ret_exec_dict.get("counts").items():
+            for key, val in (ret_exec_dict.get("counts") or {}).items():
                 counts = f'{counts}\n{key}: {val}'
             report = f'*** run_cvrp() report *** \n\n \
 count summary:\n\t{counts}\n\n \
@@ -659,20 +669,25 @@ if __name__ == "__main__":
             elif cmd == 'upload' and val:
                 ok_upload = upload_pod_to_remedix(sftp, this_input)
             elif cmd == 'cvrp' and val:
-                if len(val[0]) == 2: # file name and tocvrp arg for artisan defined in cvrp_options
-                    remedix_input_file = val[0][0]
-                    if val[0][1] in tocvrp_options:
-                        this_option = str(val[0][1])
-                    else:
-                        msg = f'Unknow argument list: {val[0]}'
-                        logging.deb(msg)
-                        print(msg)
-                        break
-                elif val[0][0] in tocvrp_options: # check if cvrp artisan option
-                    this_option = str(val[0][0])
-                else:  # remedix file name
-                    remedix_input_file = str(val[0][0])
-                ok_cvrp, ret_exec = run_cvrp(remedix_input_file, this_option)
+                if (len(val[0]) == 0): # no args, run cvrp with default options
+                    msg = 'No arguments provided for cvrp, No task  executed.'
+                    logging.debug(msg)
+                    print(msg)
+                else:
+                    if (len(val[0]) == 2): # file name and tocvrp arg for artisan defined in cvrp_options
+                        remedix_input_file = val[0][0]
+                        if val[0][1] in tocvrp_options:
+                            this_option = str(val[0][1])
+                        else:
+                            msg = f'Unknow argument list: {val[0]}'
+                            logging.deb(msg)
+                            print(msg)
+                            break
+                    elif val[0][0] in tocvrp_options: # check if cvrp artisan option
+                        this_option = str(val[0][0])
+                    else:  # remedix file name
+                        remedix_input_file = str(val[0][0])
+                    ok_cvrp, ret_exec = run_cvrp(remedix_input_file, this_option)
             elif cmd == 'deb' and val:
                 msg = f"deb mode: {val}"
                 logging.debug(msg)
