@@ -19,10 +19,11 @@
     1.3.4   add sms notification in case there is an issue with the sftp
     1.4     added new artisan tocvrp options/flags to have stepwise validation process
     1.4.1   sys.exit(0)
+    1.4.2   Disable key-based auth by not passing pkey
 
 """
 
-_VERSION = '1.4.1'
+_VERSION = '1.4.2'
 
 import paramiko
 import logging
@@ -345,7 +346,7 @@ def connect_to_sftp(host, port, username, password, sftp_key, auth_type):
             sftp_key = paramiko.RSAKey.from_private_key_file(sftp_key)
             transport.connect(username = username, pkey = sftp_key)
         elif auth_type == "user_pass":
-            transport.connect(username = username, password = password)
+            transport.connect(None, username = username, password = password) # Disable key-based auth by not passing pkey
         else:
             msg = "connect_to_sftp err, unknown auth_type {}".format(auth_type)
             logging.log(logging.WARNING, msg)
